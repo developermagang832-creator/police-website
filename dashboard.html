@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - Kepolisian Nexotis</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="navbar-mount"></div>
+
+  <div class="container">
+    <div class="card">
+      <h2 id="greeting">Memuat...</h2>
+      <div class="sub" id="rank-div">Pangkat | Divisi</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card hours">
+        <div class="label">Total Akumulasi Jam Kerja</div>
+        <div class="value" id="stat-jam">0.00 Jam</div>
+      </div>
+    </div>
+
+    <div class="pill-row">
+      <div class="pill hadir"><div class="num" id="pill-hadir">0</div><div class="lbl">Hadir</div></div>
+      <div class="pill izin"><div class="num" id="pill-izin">0</div><div class="lbl">Izin</div></div>
+      <div class="pill cuti"><div class="num" id="pill-cuti">0</div><div class="lbl">Cuti</div></div>
+      <div class="pill alpa"><div class="num" id="pill-alpa">0</div><div class="lbl">Alpa</div></div>
+    </div>
+
+    <div class="card promo-card" id="promo-card" style="display:none">
+      <h2>🎖️ Kenaikan Pangkat</h2>
+      <div class="promo-next" id="promo-next">Pangkat Selanjutnya: -</div>
+      <div class="promo-syarat" id="promo-syarat"><strong>Syarat:</strong> -</div>
+      <div class="promo-progress-bar"><div class="promo-progress-fill" id="promo-progress-fill"></div></div>
+      <div class="promo-progress-label" id="promo-progress-label"></div>
+    </div>
+    <div class="card" id="promo-maxed" style="display:none">
+      <h2>🎖️ Kenaikan Pangkat</h2>
+      <div class="sub">Kamu sudah berada di pangkat tertinggi. Mantap!</div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Riwayat Absensi Minggu Ini</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Tanggal</th><th>Tipe</th><th>Waktu Duty</th><th>Status</th><th>Keterangan</th><th>Bukti</th></tr>
+          </thead>
+          <tbody id="riwayat-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Kirim Laporan Resmi</h2>
+      <div class="sub">Laporan akan berstatus "pending" sampai diverifikasi High Command.</div>
+
+      <div class="form-group">
+        <label>Status Kehadiran</label>
+        <div class="radio-group" id="tipe-group">
+          <label class="radio-option selected" data-tipe="hadir"><input type="radio" name="tipe" value="hadir" checked> HADIR (ON DUTY)</label>
+          <label class="radio-option" data-tipe="izin"><input type="radio" name="tipe" value="izin"> IZIN (HALANGAN)</label>
+          <label class="radio-option" data-tipe="cuti"><input type="radio" name="tipe" value="cuti"> CUTI (RENTANG WAKTU)</label>
+        </div>
+      </div>
+
+      <div class="form-group" id="field-tanggal">
+        <label for="tanggal">Tanggal</label>
+        <input type="date" id="tanggal">
+      </div>
+
+      <div class="form-group form-row" id="field-cuti" style="display:none">
+        <div><label for="cuti-mulai">Periode cuti mulai</label><input type="date" id="cuti-mulai"></div>
+        <div><label for="cuti-selesai">Periode cuti berakhir</label><input type="date" id="cuti-selesai"></div>
+      </div>
+
+      <div class="form-group form-row" id="field-duty">
+        <div><label for="waktu-mulai">Waktu duty mulai</label><input type="time" id="waktu-mulai" value="08:00"></div>
+        <div><label for="waktu-selesai">Waktu duty selesai</label><input type="time" id="waktu-selesai" value="16:00"></div>
+      </div>
+
+      <div class="form-group" id="field-foto">
+        <label>Bukti foto (screenshot in-game) *1–3 foto, wajib untuk hadir</label>
+        <div id="dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s ease,background .2s ease;">
+          <div style="font-size:24px;margin-bottom:6px">📷</div>
+          <div style="font-size:12px;color:var(--muted)">Tarik &amp; lepas foto di sini, atau klik untuk pilih (maks. 3)</div>
+          <input type="file" id="foto" accept="image/*" multiple style="display:none">
+        </div>
+        <div id="foto-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="keterangan">Kegiatan / alasan</label>
+        <textarea id="keterangan" placeholder="masukan deskripsinya"></textarea>
+      </div>
+
+      <div class="error-msg" id="form-error"></div>
+      <button class="btn btn-primary" id="submit-btn">Kirim Laporan Resmi</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="foto-modal">
+    <div class="modal-box">
+      <div id="modal-zoom-wrap" style="display:none;text-align:center"></div>
+      <div id="modal-img-list" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px"></div>
+      <button class="btn btn-secondary" id="modal-close">Tutup</button>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+<script>
+  let user, myRecords = [];
+
+  (async function init() {
+    user = await requireAuth();
+    if (!user) return;
+    renderNavbar("dashboard", user);
+    document.getElementById("greeting").textContent = `Halo, ${user.username}`;
+    document.getElementById("rank-div").textContent = user.pangkat;
+    document.getElementById("tanggal").value = toISO(new Date());
+    await refreshAll();
+  })();
+
+  async function refreshAll() {
+    const data = await api("/api/absensi");
+    myRecords = data.absensi;
+    refreshStats();
+    refreshRiwayat();
+  }
+
+  function refreshStats() {
+    const s = calcStatsFromRecords(myRecords);
+    document.getElementById("stat-jam").textContent = s.totalJam.toFixed(2) + " Jam";
+    document.getElementById("pill-hadir").textContent = s.hadir;
+    document.getElementById("pill-izin").textContent = s.izin;
+    document.getElementById("pill-cuti").textContent = s.cuti;
+    document.getElementById("pill-alpa").textContent = s.alpa;
+    refreshPromo();
+  }
+
+  function refreshPromo() {
+    const promo = user.promosi;
+    if (!promo || promo.maxed) {
+      document.getElementById("promo-card").style.display = "none";
+      document.getElementById("promo-maxed").style.display = "block";
+      return;
+    }
+    document.getElementById("promo-maxed").style.display = "none";
+    document.getElementById("promo-card").style.display = "block";
+    document.getElementById("promo-next").textContent = `Pangkat Selanjutnya: ${promo.pangkatBerikutnya}`;
+    document.getElementById("promo-syarat").innerHTML = `<strong>Syarat:</strong> ${promo.syarat}`;
+
+    const fill = document.getElementById("promo-progress-fill");
+    fill.style.width = promo.persen + "%";
+    fill.classList.toggle("selesai", promo.tercapai);
+    document.getElementById("promo-progress-label").textContent = promo.tercapai ? "✅ Syarat jam terpenuhi" : "";
+  }
+
+  function refreshRiwayat() {
+    const week = getWeekDates();
+    const rows = myRecords
+      .filter((a) => week.includes(a.tanggal) || (a.tipe === "cuti" && eachDateInRange(a.cutiMulai, a.cutiSelesai).some((d) => week.includes(d))))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const tbody = document.getElementById("riwayat-body");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty">Belum ada laporan minggu ini.</td></tr>`; return; }
+    tbody.innerHTML = rows.map((a) => {
+      const waktu = a.tipe === "hadir" ? `${a.waktuMulai || "-"} - ${a.waktuSelesai || "-"}`
+        : a.tipe === "cuti" ? `${formatTanggal(a.cutiMulai)} s/d ${formatTanggal(a.cutiSelesai)}` : "-";
+      const foto = (Array.isArray(a.foto) && a.foto.length) ? `<button class="btn-link" onclick="showFoto('${a.id}')">Lihat (${a.foto.length})</button>` : "-";
+      return `<tr>
+        <td>${formatTanggal(a.tanggal)}</td>
+        <td style="text-transform:capitalize">${a.tipe}</td>
+        <td>${waktu}</td>
+        <td><span class="badge ${a.status}">${a.status}</span>${a.status === "ditolak" && a.alasan ? `<div style="font-size:10px;color:var(--faint);margin-top:3px">${a.alasan}</div>` : ""}</td>
+        <td>${a.keterangan || "-"}</td>
+        <td>${foto}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  let currentFotoList = [];
+  function showFoto(id) {
+    const rec = myRecords.find((a) => a.id === id);
+    if (!rec || !Array.isArray(rec.foto) || !rec.foto.length) return;
+    currentFotoList = rec.foto;
+    renderFotoGallery();
+    document.getElementById("foto-modal").classList.add("open");
+  }
+  function renderFotoGallery() {
+    document.getElementById("modal-zoom-wrap").style.display = "none";
+    const listEl = document.getElementById("modal-img-list");
+    listEl.style.display = "flex";
+    listEl.innerHTML = currentFotoList.map((src, i) =>
+      `<img src="${src}" onclick="zoomFoto(${i})" style="max-width:120px;border-radius:8px;border:1px solid var(--border);cursor:zoom-in">`
+    ).join("");
+  }
+  function zoomFoto(i) {
+    document.getElementById("modal-img-list").style.display = "none";
+    const wrap = document.getElementById("modal-zoom-wrap");
+    wrap.style.display = "block";
+    wrap.innerHTML = `
+      <img src="${currentFotoList[i]}" style="max-width:100%;max-height:65vh;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;cursor:zoom-out" onclick="renderFotoGallery()">
+      <div style="margin-bottom:10px"><button class="btn btn-secondary" onclick="renderFotoGallery()">🔍 Zoom Out</button></div>`;
+  }
+  document.getElementById("modal-close").addEventListener("click", () => document.getElementById("foto-modal").classList.remove("open"));
+
+  document.querySelectorAll("#tipe-group .radio-option").forEach((label) => {
+    label.addEventListener("click", () => {
+      document.querySelectorAll("#tipe-group .radio-option").forEach((l) => l.classList.remove("selected"));
+      label.classList.add("selected");
+      label.querySelector("input").checked = true;
+      const tipe = label.dataset.tipe;
+      document.getElementById("field-cuti").style.display = tipe === "cuti" ? "flex" : "none";
+      document.getElementById("field-duty").style.display = tipe === "hadir" ? "flex" : "none";
+      document.getElementById("field-tanggal").style.display = tipe === "cuti" ? "none" : "block";
+      document.getElementById("field-foto").style.display = tipe === "hadir" ? "block" : "none";
+      if (tipe !== "hadir") { fotoList = []; renderFotoPreview(); }
+    });
+  });
+
+  const MAX_FOTO = 3;
+  let fotoList = [];
+
+  function renderFotoPreview() {
+    const previewEl = document.getElementById("foto-preview");
+    previewEl.innerHTML = fotoList.map((src, i) => `
+      <div style="position:relative">
+        <img src="${src}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        <button type="button" onclick="removeFoto(${i})" style="position:absolute;top:-6px;right:-6px;background:#b91c1c;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;">×</button>
+      </div>`).join("");
+  }
+
+  function removeFoto(i) {
+    fotoList.splice(i, 1);
+    renderFotoPreview();
+  }
+
+  // Foto discreenshot in-game biasanya beberapa MB per file — kalau dikirim mentah
+  // sebagai base64 (apalagi sampai 3 foto sekaligus), gampang kena 413 Payload Too
+  // Large di server. Makanya di-resize & dikompres dulu jadi JPEG di browser sebelum
+  // diubah ke data URL, supaya ukurannya jauh lebih kecil tapi tetap jelas dibaca.
+  function compressImage(file, maxDim = 1280, quality = 0.72) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Gagal memuat foto.")); };
+      img.src = objectUrl;
+    });
+  }
+
+  // Kalau data URL hasil kompresi masih gede banget (foto sangat kompleks / resolusi
+  // ekstrem), kompres ulang dengan kualitas lebih rendah supaya tetap aman dikirim.
+  async function compressUntilSmallEnough(file, maxBytes = 900 * 1024) {
+    let quality = 0.72;
+    let dataUrl = await compressImage(file, 1280, quality);
+    while (dataUrl.length * 0.75 > maxBytes && quality > 0.35) {
+      quality -= 0.12;
+      dataUrl = await compressImage(file, 1280, quality);
+    }
+    return dataUrl;
+  }
+
+  async function addFiles(fileList) {
+    const errorEl = document.getElementById("form-error");
+    errorEl.textContent = "";
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    for (const file of files) {
+      if (fotoList.length >= MAX_FOTO) {
+        errorEl.textContent = `Maksimal ${MAX_FOTO} foto.`;
+        break;
+      }
+      try {
+        const dataUrl = await compressUntilSmallEnough(file);
+        fotoList.push(dataUrl);
+      } catch (e) {
+        errorEl.textContent = `Gagal memproses foto "${file.name}": ${e.message}`;
+      }
+    }
+    renderFotoPreview();
+  }
+
+  const dropzone = document.getElementById("dropzone");
+  const fotoInput = document.getElementById("foto");
+  dropzone.addEventListener("click", () => fotoInput.click());
+  fotoInput.addEventListener("change", (e) => { addFiles(e.target.files); fotoInput.value = ""; });
+
+  ["dragenter", "dragover"].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "var(--red)";
+    dropzone.style.background = "rgba(190, 24, 93, 0.08)";
+  }));
+  ["dragleave", "drop"].forEach((evt) => dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "var(--border)";
+    dropzone.style.background = "transparent";
+  }));
+  dropzone.addEventListener("drop", (e) => { addFiles(e.dataTransfer.files); });
+
+  document.getElementById("submit-btn").addEventListener("click", async () => {
+    const tipe = document.querySelector('input[name="tipe"]:checked').value;
+    const errorEl = document.getElementById("form-error");
+    errorEl.textContent = "";
+
+    if (tipe === "hadir" && fotoList.length < 1) { errorEl.textContent = "Minimal 1 foto bukti wajib untuk laporan hadir."; return; }
+    if (tipe === "cuti" && (!document.getElementById("cuti-mulai").value || !document.getElementById("cuti-selesai").value)) {
+      errorEl.textContent = "Periode cuti wajib diisi."; return;
+    }
+
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true; btn.textContent = "Mengirim...";
+    try {
+      await api("/api/absensi", { method: "POST", body: JSON.stringify({
+        tipe,
+        tanggal: document.getElementById("tanggal").value,
+        waktuMulai: tipe === "hadir" ? document.getElementById("waktu-mulai").value : null,
+        waktuSelesai: tipe === "hadir" ? document.getElementById("waktu-selesai").value : null,
+        cutiMulai: tipe === "cuti" ? document.getElementById("cuti-mulai").value : null,
+        cutiSelesai: tipe === "cuti" ? document.getElementById("cuti-selesai").value : null,
+        foto: fotoList,
+        keterangan: document.getElementById("keterangan").value,
+      })});
+      document.getElementById("keterangan").value = "";
+      document.getElementById("foto").value = "";
+      fotoList = [];
+      renderFotoPreview();
+      await refreshAll();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Kirim Laporan Resmi";
+    }
+  });
+</script>
+</body>
+</html>

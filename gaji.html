@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maintance</title>
+  <style>
+    :root {
+      /* --- Palet Warna Soft Pink --- */
+      --bg: #fff0f5; /* Lavender Blush / Soft Pink */
+      --card: rgba(255, 255, 255, 0.65); /* Glassmorphism card */
+      --border: rgba(255, 182, 193, 0.6); /* Soft pink border */
+      
+      --red: #ff7aa2; /* Primary Strawberry Pink */
+      --red-light: #ff99cc;
+      --pink-glow: #ffb6c1;
+      --pink-soft: #ffe4e1;
+      
+      --text: #5c434a; /* Teks coklat-pink gelap agar mudah dibaca */
+      --muted: #9e7f88;
+      --faint: #b397a0;
+      
+      --green: #10b981; /* Warna status disesuaikan untuk latar terang */
+      --amber: #d97706;
+      --blue: #3b82f6;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes glowPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 162, 0.35); }
+      50% { box-shadow: 0 0 0 10px rgba(255, 122, 162, 0); }
+    }
+
+    @keyframes floatFlag {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-4px) rotate(3deg); }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      background-image: radial-gradient(circle at 15% 20%, rgba(255, 122, 162, 0.15), transparent 40%),
+                        radial-gradient(circle at 85% 75%, rgba(255, 153, 204, 0.15), transparent 45%);
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .dev-wrap {
+      width: 100%;
+      max-width: 440px;
+      animation: fadeSlideUp 0.5s ease both;
+    }
+
+    .dev-card {
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 28px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(255, 122, 162, 0.15);
+    }
+
+    .icon-box {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 122, 162, 0.15);
+      border: 2px solid var(--red);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px auto;
+      animation: glowPulse 2.2s ease-in-out infinite;
+    }
+
+    .icon-box .flag {
+      font-size: 38px;
+      display: inline-block;
+      animation: floatFlag 3s ease-in-out infinite;
+    }
+
+    .badge-status {
+      display: inline-block;
+      background: rgba(255, 122, 162, 0.2);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      color: var(--red);
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+      letter-spacing: 0.03em;
+    }
+
+    p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0 0 24px 0;
+    }
+
+    .progress-box {
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      border-radius: 6px;
+      background: rgba(92, 67, 74, 0.08);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 60%; /* Ubah persentase progress di sini */
+      background: linear-gradient(135deg, var(--red), var(--red-light));
+      border-radius: 6px;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 11px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      box-sizing: border-box;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+      background: linear-gradient(135deg, var(--red), var(--red-light));
+      color: #fff;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, #ff5c8a, var(--red));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(255, 122, 162, 0.35);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .foot {
+      color: var(--faint);
+      font-size: 11px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dev-wrap">
+    <div class="dev-card">
+      
+      <div class="icon-box">
+        <span class="flag">💸</span>
+      </div>
+
+      <div class="badge-status">Tahap Pengembangan</div>
+
+      <h1>SISTEM PENGAMBILAN GAJI</h1>
+
+      <p>
+        Sabar ya anjeng, lagi tahap pengembangan ini systemm gajinya ye. sementara pakai yang di discord dulu aja.
+      </p>
+
+      <div class="progress-box">
+        <div class="progress-info">
+          <span>Progres Pengerjaan</span>
+          <span style="color: var(--red);">60%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+
+      <a href="dashboard.html" class="btn">Kembali ke Dashboard</a>
+
+      <div class="foot">© 2026 Kepolisian Nexotis</div>
+    </div>
+  </div>
+
+</body>
+</html>
