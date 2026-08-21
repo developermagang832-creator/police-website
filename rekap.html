@@ -101,9 +101,18 @@
 
       <div class="card">
         <h2>Daftar Anggota</h2>
+        <div class="bulk-actions">
+          <div class="sub" id="bulk-count-label">Belum ada yang dipilih.</div>
+          <button class="btn btn-secondary" id="bulk-delete-btn" style="background:#7c2d12;color:#fed7aa" disabled>🗑️ Hapus Terpilih</button>
+        </div>
         <div style="overflow-x:auto">
           <table>
-            <thead><tr><th>Username</th><th>Pangkat</th><th>Akses</th><th>Aksi</th></tr></thead>
+            <thead>
+              <tr>
+                <th class="checkbox-cell"><input type="checkbox" class="select-all-check" id="select-all-users"></th>
+                <th>Username</th><th>Pangkat</th><th>Akses</th><th>Aksi</th>
+              </tr>
+            </thead>
             <tbody id="users-body"></tbody>
           </table>
         </div>
@@ -154,7 +163,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], allPromosi = [];
+  let allUsers = [], allAbsensi = [], allPromosi = [], currentUserId = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -174,6 +183,7 @@
     const user = await requireAuth();
     if (!user) return;
     if (!user.isHighCommand) { window.location.href = "dashboard.html"; return; }
+    currentUserId = user.id;
     renderNavbar("rekap", user);
     await refreshAll();
   })();
@@ -362,9 +372,16 @@
     }
   }
 
+  const selectedUserIds = new Set();
+
   function refreshUsers() {
+    // Buang id yang kepilih tapi anggotanya udah nggak ada lagi di data terbaru.
+    const validIds = new Set(allUsers.map((u) => u.id));
+    Array.from(selectedUserIds).forEach((id) => { if (!validIds.has(id)) selectedUserIds.delete(id); });
+
     const tbody = document.getElementById("users-body");
     tbody.innerHTML = allUsers.map((u) => `<tr>
+      <td class="checkbox-cell"><input type="checkbox" class="row-check" data-id="${u.id}" ${selectedUserIds.has(u.id) ? "checked" : ""} ${u.id === currentUserId ? "disabled title=\"Nggak bisa hapus akun sendiri\"" : ""}></td>
       <td>${u.username}</td>
       <td>${u.pangkat}</td>
       <td>${u.isHighCommand ? '<span class="badge rank">High Command</span>' : '<span class="badge pending">Anggota</span>'}</td>
@@ -372,8 +389,60 @@
         <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px;margin-right:4px" onclick="openEdit('${u.id}')">Edit</button>
         <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px;background:#7c2d12;color:#fed7aa" onclick="deleteUser('${u.id}','${u.username}')">Hapus</button>
       </td>
-    </tr>`).join("") || `<tr><td colspan="4" class="empty">Belum ada anggota.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="5" class="empty">Belum ada anggota.</td></tr>`;
+
+    tbody.querySelectorAll(".row-check").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) selectedUserIds.add(cb.dataset.id); else selectedUserIds.delete(cb.dataset.id);
+        updateBulkUI();
+      });
+    });
+    updateBulkUI();
   }
+
+  function updateBulkUI() {
+    const count = selectedUserIds.size;
+    const label = document.getElementById("bulk-count-label");
+    const btn = document.getElementById("bulk-delete-btn");
+    label.textContent = count ? `${count} anggota dipilih.` : "Belum ada yang dipilih.";
+    btn.disabled = count === 0;
+
+    const selectAll = document.getElementById("select-all-users");
+    const checkable = allUsers.filter((u) => u.id !== currentUserId);
+    selectAll.checked = checkable.length > 0 && checkable.every((u) => selectedUserIds.has(u.id));
+    selectAll.indeterminate = count > 0 && !selectAll.checked;
+  }
+
+  document.getElementById("select-all-users").addEventListener("change", (e) => {
+    if (e.target.checked) {
+      allUsers.forEach((u) => { if (u.id !== currentUserId) selectedUserIds.add(u.id); });
+    } else {
+      selectedUserIds.clear();
+    }
+    refreshUsers();
+  });
+
+  document.getElementById("bulk-delete-btn").addEventListener("click", async () => {
+    const ids = Array.from(selectedUserIds);
+    if (!ids.length) return;
+    const names = ids.map((id) => allUsers.find((u) => u.id === id)?.username).filter(Boolean);
+    if (!confirm(`Hapus ${ids.length} anggota terpilih (${names.join(", ")})? Aksi ini tidak bisa dibatalkan.`)) return;
+
+    const btn = document.getElementById("bulk-delete-btn");
+    btn.disabled = true; btn.textContent = "Menghapus...";
+    try {
+      for (const id of ids) {
+        await api(`/api/admin/users/${id}`, { method: "DELETE" });
+      }
+      selectedUserIds.clear();
+      await refreshAll();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.textContent = "🗑️ Hapus Terpilih";
+      updateBulkUI();
+    }
+  });
 
   document.getElementById("nu-submit").addEventListener("click", async () => {
     const errorEl = document.getElementById("nu-error");
