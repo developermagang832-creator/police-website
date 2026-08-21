@@ -468,7 +468,34 @@ textarea { resize: vertical; min-height: 60px; }
 .login-card .foot { color: var(--faint); font-size: 10px; margin-top: 18px; }
 .error-msg { color: #ef4444; font-size: 12px; margin-top: 10px; min-height: 16px; }
 
-.tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabs {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.checkbox-cell { width: 34px; text-align: center; }
+.row-check, .select-all-check {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--red);
+  cursor: pointer;
+}
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 122, 162, 0.08);
+  border: 1px solid var(--border);
+}
+.bulk-actions .sub { margin: 0; }
 
 .empty { color: var(--faint); font-size: 12px; padding: 10px 0; }
 
