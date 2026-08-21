@@ -109,23 +109,23 @@ function renderNavbar(activePage, user) {
   const linkOrSpan = (href, label, page) =>
     activePage === page ? `<span class="active">${label}</span>` : `<a href="${href}">${label}</a>`;
 
-  const navLinkOrSpan = (href, label, page) =>
-    activePage === page
-      ? `<span class="active" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px">${label}</span>`
-      : `<a href="${href}" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px">${label}</a>`;
+  const navItems = [
+    ["dashboard.html", "Dashboard", "dashboard"],
+    ["gaji.html", "Gaji", "gaji"],
+    ...(user.isHighCommand ? [["rekap.html", "Panel Rekap Pati Only", "rekap"]] : []),
+    ["undang-undang.html", "Undang-Undang", "undang-undang"],
+    ["arrest-record.html", "Arrest Record", "arrest-record"],
+  ];
+  const navLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
+  const navMenuLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
 
   mount.innerHTML = `
     <div class="navbar">
       <div class="brand"><span class="flag">🚔</span> kepolisian nexotis</div>
-      <div class="nav-toggle-wrap" id="nav-toggle" style="position:relative;cursor:pointer">
-        <button type="button" aria-label="Buka menu navigasi" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:16px;line-height:1;padding:6px 12px;cursor:pointer">&#8942;</button>
-        <div id="nav-menu" style="display:none;position:absolute;top:100%;left:0;margin-top:8px;background:var(--card,#1e293b);border:1px solid var(--border,#334155);border-radius:10px;overflow:hidden;min-width:200px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.3)">
-          ${navLinkOrSpan("dashboard.html", "Dashboard", "dashboard")}
-          ${navLinkOrSpan("gaji.html", "Gaji", "gaji")}
-          ${user.isHighCommand ? navLinkOrSpan("rekap.html", "Panel Rekap Pati Only", "rekap") : ""}
-          ${navLinkOrSpan("undang-undang.html", "Undang-Undang", "undang-undang")}
-          ${navLinkOrSpan("arrest-record.html", "Arrest Record", "arrest-record")}
-        </div>
+      <nav id="nav-links">${navLinksHtml}</nav>
+      <div class="nav-toggle-wrap" id="nav-toggle" style="display:none">
+        <button type="button" aria-label="Buka menu navigasi" id="nav-toggle-btn">&#8942;</button>
+        <div id="nav-menu">${navMenuLinksHtml}</div>
       </div>
       <div class="user" id="profile-toggle" style="position:relative;cursor:pointer">
         <div class="info">
@@ -145,24 +145,42 @@ function renderNavbar(activePage, user) {
     av.style.backgroundSize = "cover";
   }
 
-  const navToggle = document.getElementById("nav-toggle");
+  const navbarEl = mount.querySelector(".navbar");
+  const navLinksEl = document.getElementById("nav-links");
+  const navToggleWrap = document.getElementById("nav-toggle");
   const navMenu = document.getElementById("nav-menu");
-  navToggle.addEventListener("click", (e) => {
+
+  // Cek apakah tab nav muat di lebar navbar. Kalau kepanjangan, sembunyikan
+  // tab-nya dan tampilkan tombol titik-tiga merah sebagai gantinya.
+  function checkNavOverflow() {
+    navToggleWrap.style.display = "none";
+    navLinksEl.style.display = "flex";
+    const overflowing = navLinksEl.scrollWidth > navLinksEl.clientWidth + 1;
+    if (overflowing) {
+      navLinksEl.style.display = "none";
+      navToggleWrap.style.display = "inline-block";
+    }
+  }
+  checkNavOverflow();
+  window.addEventListener("resize", checkNavOverflow);
+
+  const navToggleBtn = document.getElementById("nav-toggle-btn");
+  navToggleBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     menu.style.display = "none";
-    navMenu.style.display = navMenu.style.display === "none" ? "block" : "none";
+    navMenu.classList.toggle("open");
   });
 
   const toggle = document.getElementById("profile-toggle");
   const menu = document.getElementById("profile-menu");
   toggle.addEventListener("click", (e) => {
     e.stopPropagation();
-    navMenu.style.display = "none";
+    navMenu.classList.remove("open");
     menu.style.display = menu.style.display === "none" ? "block" : "none";
   });
   document.addEventListener("click", () => {
     menu.style.display = "none";
-    navMenu.style.display = "none";
+    navMenu.classList.remove("open");
   });
 
   document.getElementById("menu-logout").addEventListener("click", async () => {
