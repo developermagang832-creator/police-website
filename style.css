@@ -47,6 +47,40 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
+/* ====== Teks berjalan (marquee) ====== */
+.marquee-bar {
+  position: sticky;
+  top: 58px; /* nempel persis di bawah navbar */
+  z-index: 9;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--red), var(--red-light));
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  white-space: nowrap;
+}
+.marquee-track {
+  display: inline-flex;
+  animation: marqueeScroll 22s linear infinite;
+  will-change: transform;
+}
+.marquee-text {
+  display: inline-block;
+  padding-right: 60px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (max-width: 640px) {
+  .marquee-bar { top: 54px; }
+  .marquee-text { font-size: 11px; }
+}
+
 .navbar {
   position: sticky;
   top: 0;
