@@ -293,7 +293,7 @@ function openProfileSettingsModal(user) {
       successEl.style.display = "none";
       const namaKarakter = document.getElementById("ps-nama").value.trim();
 
-      const body = { namaKarakter };
+      const body = { updateProfile: true, namaKarakter };
       const pending = modal.dataset.pendingAvatar;
       if (pending === "__remove__") body.avatar = null;
       else if (pending) body.avatar = pending;
@@ -301,7 +301,7 @@ function openProfileSettingsModal(user) {
       const btn = document.getElementById("ps-save");
       btn.disabled = true; btn.textContent = "Menyimpan...";
       try {
-        await api("/api/profile", { method: "POST", body: JSON.stringify(body) });
+        await api("/api/me", { method: "POST", body: JSON.stringify(body) });
         successEl.style.display = "block";
         delete modal.dataset.pendingAvatar;
         setTimeout(() => window.location.reload(), 700);
