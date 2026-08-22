@@ -103,7 +103,7 @@ function calcStatsFromRecords(records) {
 
 // Teks berjalan di bawah navbar — gaya kayak website instansi resmi (mis.
 // polri.go.id). Edit teksnya di sini kalau mau ganti pengumuman.
-const MARQUEE_TEXT = "Selamat datang di Website Resmi Kepolisian Nexotis — Jaga Keamanan, Layani Masyarakat, Tegakkan Hukum dengan Integritas.";
+const MARQUEE_TEXT = "Selamat datang di Website Kepolisian Nexotos roleplaying, Tolong ketika ingin laporan arrest record atau duty, dll.. isi yang benar ya temen-temen..";
 
 /* ====== Navbar ====== */
 function renderNavbar(activePage, user) {
