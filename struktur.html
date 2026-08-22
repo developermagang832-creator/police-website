@@ -48,7 +48,7 @@
   })();
 
   async function loadStruktur() {
-    const data = await api("/api/struktur");
+    const data = await api("/api/me?view=struktur");
     members = data.members;
     renderStruktur(members);
   }
