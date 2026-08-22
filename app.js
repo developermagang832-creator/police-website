@@ -111,6 +111,7 @@ function renderNavbar(activePage, user) {
 
   const navItems = [
     ["dashboard.html", "Dashboard", "dashboard"],
+    ["struktur.html", "Struktur Anggota", "struktur"],
     ["gaji.html", "Gaji", "gaji"],
     ...(user.isHighCommand ? [["rekap.html", "Panel Rekap Pati Only", "rekap"]] : []),
     ["undang-undang.html", "Undang-Undang", "undang-undang"],
@@ -134,7 +135,8 @@ function renderNavbar(activePage, user) {
         </div>
         <div class="avatar">${user.avatar ? "" : initials}</div>
         <div id="profile-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;background:var(--card,#1e293b);border:1px solid var(--border,#334155);border-radius:10px;overflow:hidden;min-width:170px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.3)">
-          <button id="menu-ganti-password" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px">Ganti Password</button>
+          <button id="menu-pengaturan-profil" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px">Pengaturan Profil</button>
+          <button id="menu-ganti-password" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;border-top:1px solid var(--border,#334155)">Ganti Password</button>
           <button id="menu-logout" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;border-top:1px solid var(--border,#334155)">Logout</button>
         </div>
       </div>
@@ -191,6 +193,141 @@ function renderNavbar(activePage, user) {
     menu.style.display = "none";
     openGantiPasswordModal();
   });
+  document.getElementById("menu-pengaturan-profil").addEventListener("click", () => {
+    menu.style.display = "none";
+    openProfileSettingsModal(user);
+  });
+}
+
+// Kompres foto profil di browser sebelum dikirim (sama alasannya kayak foto
+// bukti absensi di dashboard.html) — tapi avatar dibuat persegi & lebih kecil
+// karena cuma ditampilin sebagai lingkaran mungil di navbar & struktur.
+function compressAvatarFile(file, maxDim = 480, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      // Crop ke tengah jadi bujur sangkar dulu, biar avatar nggak gepeng.
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = (img.height - side) / 2;
+      const dim = Math.min(side, maxDim);
+      const canvas = document.createElement("canvas");
+      canvas.width = dim;
+      canvas.height = dim;
+      canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, dim, dim);
+      URL.revokeObjectURL(objectUrl);
+      let q = quality;
+      let dataUrl = canvas.toDataURL("image/jpeg", q);
+      while (dataUrl.length * 0.75 > 400 * 1024 && q > 0.35) {
+        q -= 0.12;
+        dataUrl = canvas.toDataURL("image/jpeg", q);
+      }
+      resolve(dataUrl);
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Gagal memuat foto.")); };
+    img.src = objectUrl;
+  });
+}
+
+// Modal Pengaturan Profil — di-inject sekali ke <body>, dipakai di semua
+// halaman yang manggil renderNavbar. Bisa ubah nama karakter & foto profil.
+function openProfileSettingsModal(user) {
+  let modal = document.getElementById("profile-settings-modal");
+  let pendingAvatar; // undefined = nggak diubah, null = dihapus, string = foto baru
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "profile-settings-modal";
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+      <div class="modal-box" style="text-align:left;max-width:360px">
+        <h2 style="margin-bottom:14px;text-align:center">Pengaturan Profil</h2>
+        <div class="avatar-upload-wrap">
+          <div class="avatar-upload-circle" id="ps-avatar-circle">Pilih Foto</div>
+          <input type="file" id="ps-avatar-input" accept="image/*" style="display:none">
+          <button type="button" class="btn-link" id="ps-avatar-remove" style="display:none">Hapus Foto</button>
+        </div>
+        <div class="form-group"><label for="ps-nama">Nama Karakter</label><input type="text" id="ps-nama" placeholder="nama character kamu" maxlength="100"></div>
+        <div class="error-msg" id="ps-error"></div>
+        <div class="sub" id="ps-success" style="color:#22c55e;display:none;margin-bottom:8px">Profil berhasil diperbarui.</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-secondary" id="ps-cancel">Tutup</button>
+          <button class="btn btn-primary" id="ps-save">Simpan</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    document.getElementById("ps-cancel").addEventListener("click", () => modal.classList.remove("open"));
+
+    const circle = document.getElementById("ps-avatar-circle");
+    const input = document.getElementById("ps-avatar-input");
+    circle.addEventListener("click", () => input.click());
+    input.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      input.value = "";
+      if (!file) return;
+      const errorEl = document.getElementById("ps-error");
+      errorEl.textContent = "";
+      try {
+        const dataUrl = await compressAvatarFile(file);
+        modal.dataset.pendingAvatar = dataUrl;
+        circle.style.backgroundImage = `url('${dataUrl}')`;
+        circle.style.backgroundSize = "cover";
+        circle.textContent = "";
+        document.getElementById("ps-avatar-remove").style.display = "inline-block";
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+    document.getElementById("ps-avatar-remove").addEventListener("click", () => {
+      modal.dataset.pendingAvatar = "__remove__";
+      circle.style.backgroundImage = "";
+      circle.textContent = "Pilih Foto";
+      document.getElementById("ps-avatar-remove").style.display = "none";
+    });
+
+    document.getElementById("ps-save").addEventListener("click", async () => {
+      const errorEl = document.getElementById("ps-error");
+      const successEl = document.getElementById("ps-success");
+      errorEl.textContent = "";
+      successEl.style.display = "none";
+      const namaKarakter = document.getElementById("ps-nama").value.trim();
+
+      const body = { namaKarakter };
+      const pending = modal.dataset.pendingAvatar;
+      if (pending === "__remove__") body.avatar = null;
+      else if (pending) body.avatar = pending;
+
+      const btn = document.getElementById("ps-save");
+      btn.disabled = true; btn.textContent = "Menyimpan...";
+      try {
+        await api("/api/profile", { method: "POST", body: JSON.stringify(body) });
+        successEl.style.display = "block";
+        delete modal.dataset.pendingAvatar;
+        setTimeout(() => window.location.reload(), 700);
+      } catch (err) {
+        errorEl.textContent = err.message;
+      } finally {
+        btn.disabled = false; btn.textContent = "Simpan";
+      }
+    });
+  }
+
+  document.getElementById("ps-error").textContent = "";
+  document.getElementById("ps-success").style.display = "none";
+  document.getElementById("ps-nama").value = user.namaKarakter || "";
+  document.getElementById("ps-avatar-remove").style.display = user.avatar ? "inline-block" : "none";
+  delete modal.dataset.pendingAvatar;
+  const circle = document.getElementById("ps-avatar-circle");
+  if (user.avatar) {
+    circle.style.backgroundImage = `url('${user.avatar}')`;
+    circle.style.backgroundSize = "cover";
+    circle.textContent = "";
+  } else {
+    circle.style.backgroundImage = "";
+    circle.textContent = "Pilih Foto";
+  }
+  modal.classList.add("open");
 }
 
 // Modal ganti password — di-inject sekali ke <body>, dipakai di semua halaman
