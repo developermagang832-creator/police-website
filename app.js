@@ -101,6 +101,10 @@ function calcStatsFromRecords(records) {
   return { totalJam, hadir: hadirDays.size, izin: izinDays.size, cuti: cutiDays.size, alpa };
 }
 
+// Teks berjalan di bawah navbar — gaya kayak website instansi resmi (mis.
+// polri.go.id). Edit teksnya di sini kalau mau ganti pengumuman.
+const MARQUEE_TEXT = "Selamat datang di Website Resmi Kepolisian Nexotis — Jaga Keamanan, Layani Masyarakat, Tegakkan Hukum dengan Integritas.";
+
 /* ====== Navbar ====== */
 function renderNavbar(activePage, user) {
   const mount = document.getElementById("navbar-mount");
@@ -111,11 +115,11 @@ function renderNavbar(activePage, user) {
 
   const navItems = [
     ["dashboard.html", "Dashboard", "dashboard"],
-    ["struktur.html", "Struktur Anggota", "struktur"],
     ["gaji.html", "Gaji", "gaji"],
     ...(user.isHighCommand ? [["rekap.html", "Panel Rekap Pati Only", "rekap"]] : []),
     ["undang-undang.html", "Undang-Undang", "undang-undang"],
     ["arrest-record.html", "Arrest Record", "arrest-record"],
+    ["struktur.html", "Struktur Anggota", "struktur"],
   ];
   const navLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
   const navMenuLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
@@ -139,6 +143,12 @@ function renderNavbar(activePage, user) {
           <button id="menu-ganti-password" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;border-top:1px solid var(--border,#334155)">Ganti Password</button>
           <button id="menu-logout" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:inherit;cursor:pointer;font-size:13px;border-top:1px solid var(--border,#334155)">Logout</button>
         </div>
+      </div>
+    </div>
+    <div class="marquee-bar">
+      <div class="marquee-track">
+        <span class="marquee-text">${MARQUEE_TEXT}</span>
+        <span class="marquee-text">${MARQUEE_TEXT}</span>
       </div>
     </div>`;
   if (user.avatar) {
