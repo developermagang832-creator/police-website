@@ -1,8 +1,26 @@
 const crypto = require("crypto");
+const { put } = require("@vercel/blob");
 const kvStore = require("../lib/kv");
 const { getUserFromReq } = require("../lib/auth");
 const { notifyLaporanMasuk } = require("../lib/discord");
 const { tambahJamPromosi } = require("../lib/promosi");
+
+// Upload 1 foto (data URL base64 dari browser) ke Vercel Blob, balikin URL publiknya.
+// Ini yang bikin Redis nggak lagi kebanjiran base64 raksasa — yang disimpan di
+// Redis nanti cuma URL pendek, foto aslinya duduk di object storage.
+async function uploadFotoKeBlob(dataUrl, absensiId, index) {
+  const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Format foto tidak valid.");
+  const mime = match[1];
+  const buffer = Buffer.from(match[2], "base64");
+  const ext = mime.split("/")[1] || "jpg";
+  const blob = await put(`absensi/${absensiId}-${index}.${ext}`, buffer, {
+    access: "public",
+    contentType: mime,
+    addRandomSuffix: true,
+  });
+  return blob.url;
+}
 
 // Durasi duty dalam jam dari "HH:MM" ke "HH:MM" (menangani lewat tengah malam).
 function calcDurasiJam(mulai, selesai) {
@@ -39,9 +57,22 @@ module.exports = async (req, res) => {
 
     const durasiJam = tipe === "hadir" ? calcDurasiJam(waktuMulai, waktuSelesai) : 0;
     const statusAwal = tipe === "hadir" && durasiJam < 6 ? "diterima" : "pending";
+    const absensiId = crypto.randomBytes(8).toString("hex");
+
+    // Upload tiap foto ke Vercel Blob dulu, baru simpan URL-nya (bukan base64-nya)
+    // ke record. Kalau salah satu upload gagal, kita hentikan sebelum sempat nulis
+    // apa pun ke Redis, supaya nggak ada foto "setengah kesimpan".
+    let fotoUrls = [];
+    try {
+      fotoUrls = await Promise.all(
+        fotoList.map((dataUrl, i) => uploadFotoKeBlob(dataUrl, absensiId, i))
+      );
+    } catch (e) {
+      return res.status(500).json({ error: "Gagal mengunggah foto: " + e.message });
+    }
 
     const record = {
-      id: crypto.randomBytes(8).toString("hex"),
+      id: absensiId,
       userId: user.id,
       tanggal: tanggal || new Date().toISOString().slice(0, 10),
       tipe,
@@ -49,7 +80,7 @@ module.exports = async (req, res) => {
       waktuSelesai: tipe === "hadir" ? waktuSelesai : null,
       cutiMulai: tipe === "cuti" ? cutiMulai : null,
       cutiSelesai: tipe === "cuti" ? cutiSelesai : null,
-      foto: fotoList,
+      foto: fotoUrls,
       keterangan: keterangan || "",
       status: statusAwal,
       alasan: null,
