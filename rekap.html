@@ -16,6 +16,7 @@
       <div>
         <h2>Panel Rekap (High Command)</h2>
         <div class="sub">Rekap kehadiran dan kelola akun anggota.</div>
+        <div class="sub" id="periode-label" style="font-size:12px;opacity:.75;margin-top:2px"></div>
       </div>
       <button class="btn btn-secondary" id="reset-btn" style="background:#7c2d12;color:#fed7aa">Reset Semua Duty</button>
     </div>
@@ -163,7 +164,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], allPromosi = [], currentUserId = null;
+  let allUsers = [], allAbsensi = [], allPromosi = [], currentUserId = null, periodeMulai = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -193,6 +194,9 @@
     allUsers = data.users;
     allAbsensi = data.absensi;
     allPromosi = data.promosi;
+    periodeMulai = data.periodeMulai;
+    const periodeLabelEl = document.getElementById("periode-label");
+    if (periodeLabelEl) periodeLabelEl.textContent = `Periode berjalan sejak ${formatTanggal(periodeMulai)} — klik "Reset Semua Duty" untuk mulai periode baru.`;
     refreshRekap();
     refreshLaporan();
     refreshUsers();
@@ -229,7 +233,7 @@
 
     const rows = allUsers.map((u) => {
       const records = allAbsensi.filter((a) => a.userId === u.id);
-      const s = calcStatsFromRecords(records);
+      const s = calcStatsFromRecords(records, effectiveMulai(periodeMulai, u.bergabung));
       return [
         (u.namaKarakter || u.username) + (u.isHighCommand ? " (HC)" : ""),
         u.pangkat,
@@ -258,7 +262,7 @@
     const tbody = document.getElementById("rekap-body");
     tbody.innerHTML = allUsers.map((u) => {
       const records = allAbsensi.filter((a) => a.userId === u.id);
-      const s = calcStatsFromRecords(records);
+      const s = calcStatsFromRecords(records, effectiveMulai(periodeMulai, u.bergabung));
       return `<tr>
         <td>${u.namaKarakter || u.username}${u.isHighCommand ? " (HC)" : ""}</td>
         <td><span class="badge rank">${u.pangkat}</span></td>
