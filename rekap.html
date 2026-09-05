@@ -231,7 +231,7 @@
       const records = allAbsensi.filter((a) => a.userId === u.id);
       const s = calcStatsFromRecords(records);
       return [
-        u.username + (u.isHighCommand ? " (HC)" : ""),
+        (u.namaKarakter || u.username) + (u.isHighCommand ? " (HC)" : ""),
         u.pangkat,
         s.totalJam.toFixed(2) + " jam",
         String(s.hadir),
@@ -260,7 +260,7 @@
       const records = allAbsensi.filter((a) => a.userId === u.id);
       const s = calcStatsFromRecords(records);
       return `<tr>
-        <td>${u.username}${u.isHighCommand ? " (HC)" : ""}</td>
+        <td>${u.namaKarakter || u.username}${u.isHighCommand ? " (HC)" : ""}</td>
         <td><span class="badge rank">${u.pangkat}</span></td>
         <td>${s.totalJam.toFixed(2)} jam</td>
         <td>${s.hadir}</td><td>${s.izin}</td><td>${s.cuti}</td><td>${s.alpa}</td>
@@ -280,7 +280,7 @@
            <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px" onclick="tolakLaporan('${a.id}')">Tolak</button>`
         : `<span class="badge ${a.status}">${a.status}</span>`;
       return `<tr>
-        <td>${u ? u.username : "-"}</td>
+        <td>${u ? (u.namaKarakter || u.username) : "-"}</td>
         <td>${formatTanggal(a.tanggal)}</td>
         <td style="text-transform:capitalize">${a.tipe}</td>
         <td>${a.keterangan || "-"}</td>
