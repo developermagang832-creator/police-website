@@ -13,5 +13,13 @@ module.exports = async (req, res) => {
   // Catatan: ini SENGAJA cuma hapus "nexotis:absensi" (buat reset periode
   // gaji mingguan), TIDAK menyentuh data user sama sekali — jadi progress
   // kenaikan pangkat (promoJam/promoLastHadir di user) tidak ikut ke-reset.
-  res.json({ ok: true, resetCount });
+
+  // Tandai mulainya periode akumulasi baru (jam kerja/hadir/izin/cuti/alpa).
+  // Ini SATU-SATUNYA tempat yang menggeser "periodeMulai" — jadi angka di
+  // dashboard & Panel Rekap TIDAK bakal auto-reset sendiri tiap ganti minggu
+  // kalender, cuma berubah kalau High Command klik tombol ini.
+  const periodeBaru = new Date().toISOString().slice(0, 10);
+  await kvStore.setPeriodeMulai(periodeBaru);
+
+  res.json({ ok: true, resetCount, periodeMulai: periodeBaru });
 };
