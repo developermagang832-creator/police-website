@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kritik & Saran - Kepolisian Nexotis</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="navbar">
+    <div class="brand"><span class="flag">🚔</span> kepolisian nexotis</div>
+    <nav id="nav-links"><a href="index.html">← Kembali ke Login Anggota</a></nav>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>📝 Kritik & Saran Warga</h2>
+      <div class="sub">Sampaikan kritik, saran, atau masukan buat Kepolisian Nexotis. Nggak perlu daftar akun / login.
+        Postingan bisa dilihat & dibalas warga lain juga — jangan tulis data pribadi yang sensitif di kolom pesan.</div>
+
+      <div class="form-group">
+        <label>Kategori</label>
+        <div class="radio-group" id="kategori-group">
+          <label class="radio-option selected" data-kategori="kritik"><input type="radio" name="kategori" value="kritik" checked> Kritik</label>
+          <label class="radio-option" data-kategori="saran"><input type="radio" name="kategori" value="saran"> Saran</label>
+          <label class="radio-option" data-kategori="lainnya"><input type="radio" name="kategori" value="lainnya"> Lainnya</label>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group"><label for="ks-nama">Nama (opsional)</label><input type="text" id="ks-nama" placeholder="Boleh dikosongkan / anonim" maxlength="100"></div>
+        <div class="form-group"><label for="ks-kontak">Kontak (opsional, cuma dilihat Petinggi)</label><input type="text" id="ks-kontak" placeholder="Nomor WA / Discord" maxlength="150"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="ks-pesan">Pesan</label>
+        <textarea id="ks-pesan" placeholder="Tulis kritik atau saran kamu di sini..." maxlength="2000" style="min-height:100px"></textarea>
+      </div>
+
+      <!-- Honeypot anti-bot: field ini disembunyikan dari mata manusia lewat CSS,
+           jadi cuma bot pengisi-form-otomatis yang bakal ngisi ini. -->
+      <div style="position:absolute;left:-9999px;opacity:0;height:0;overflow:hidden" aria-hidden="true">
+        <label for="ks-website">Jangan diisi</label>
+        <input type="text" id="ks-website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <button class="btn btn-primary" id="ks-submit">Kirim Postingan</button>
+      <div class="error-msg" id="ks-error"></div>
+      <div class="sub" id="ks-success" style="color:#22c55e;display:none;margin-top:8px">Terima kasih! Postingan kamu sudah terkirim.</div>
+    </div>
+
+    <div class="card">
+      <h2>Postingan Warga</h2>
+      <div class="sub">Semua kiriman kritik & saran warga, dari yang paling baru.</div>
+      <div id="feed-empty" class="empty" style="display:none">Belum ada postingan. Jadilah yang pertama!</div>
+      <div id="feed-list"></div>
+    </div>
+  </div>
+
+<script>
+  const KATEGORI_LABEL = { kritik: "Kritik", saran: "Saran", lainnya: "Lainnya" };
+  const KATEGORI_COLOR = { kritik: "pending", saran: "diterima", lainnya: "rank" };
+
+  function fmtWaktu(iso) {
+    return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  document.querySelectorAll("#kategori-group .radio-option").forEach((label) => {
+    label.addEventListener("click", () => {
+      document.querySelectorAll("#kategori-group .radio-option").forEach((l) => l.classList.remove("selected"));
+      label.classList.add("selected");
+    });
+  });
+
+  async function apiPublic(path, options = {}) {
+    const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* no body */ }
+    if (!res.ok) throw new Error((data && data.error) || `Terjadi kesalahan (${res.status})`);
+    return data;
+  }
+
+  document.getElementById("ks-submit").addEventListener("click", async () => {
+    const errorEl = document.getElementById("ks-error");
+    const successEl = document.getElementById("ks-success");
+    errorEl.textContent = "";
+    successEl.style.display = "none";
+
+    const kategori = document.querySelector("#kategori-group input:checked").value;
+    const nama = document.getElementById("ks-nama").value.trim();
+    const kontak = document.getElementById("ks-kontak").value.trim();
+    const pesan = document.getElementById("ks-pesan").value.trim();
+    const website = document.getElementById("ks-website").value; // honeypot
+    if (!pesan) { errorEl.textContent = "Pesan wajib diisi."; return; }
+
+    const btn = document.getElementById("ks-submit");
+    btn.disabled = true; btn.textContent = "Mengirim...";
+    try {
+      await apiPublic("/api/kritik-saran", { method: "POST", body: JSON.stringify({ kategori, nama, kontak, pesan, website }) });
+      document.getElementById("ks-nama").value = "";
+      document.getElementById("ks-kontak").value = "";
+      document.getElementById("ks-pesan").value = "";
+      successEl.style.display = "block";
+      await refreshFeed();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Kirim Postingan";
+    }
+  });
+
+  async function refreshFeed() {
+    const listEl = document.getElementById("feed-list");
+    const emptyEl = document.getElementById("feed-empty");
+    let posts = [];
+    try {
+      const data = await apiPublic("/api/kritik-saran");
+      posts = data.list || [];
+    } catch (e) {
+      listEl.innerHTML = "";
+      emptyEl.style.display = "block";
+      emptyEl.textContent = "Gagal memuat postingan: " + e.message;
+      return;
+    }
+    if (!posts.length) {
+      listEl.innerHTML = "";
+      emptyEl.style.display = "block";
+      emptyEl.textContent = "Belum ada postingan. Jadilah yang pertama!";
+      return;
+    }
+    emptyEl.style.display = "none";
+    listEl.innerHTML = posts.map(renderPost).join("");
+
+    posts.forEach((p) => {
+      const btn = document.getElementById(`reply-submit-${p.id}`);
+      if (btn) btn.addEventListener("click", () => submitReply(p.id));
+    });
+  }
+
+  function renderPost(p) {
+    const namaTampil = p.nama ? escapeHtml(p.nama) : `<span class="empty">Warga (Anonim)</span>`;
+    const replies = p.replies || [];
+    const repliesHtml = replies.length
+      ? replies.map((r) => `
+        <div style="border-left:2px solid var(--border);padding:6px 0 6px 10px;margin-top:8px">
+          <div style="font-size:12px;font-weight:700">${r.nama ? escapeHtml(r.nama) : '<span class="empty">Warga (Anonim)</span>'}
+            <span style="font-weight:400;color:var(--faint);font-size:11px"> · ${fmtWaktu(r.createdAt)}</span>
+          </div>
+          <div style="font-size:13px;white-space:pre-wrap">${escapeHtml(r.pesan)}</div>
+        </div>`).join("")
+      : `<div class="empty" style="margin-top:8px">Belum ada balasan.</div>`;
+
+    return `
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+          <span class="badge ${KATEGORI_COLOR[p.kategori] || "rank"}">${KATEGORI_LABEL[p.kategori] || p.kategori}</span>
+          <span style="font-size:11px;color:var(--faint)">${fmtWaktu(p.createdAt)}</span>
+        </div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">${namaTampil}</div>
+        <div style="font-size:14px;white-space:pre-wrap;margin-bottom:10px">${escapeHtml(p.pesan)}</div>
+
+        <details>
+          <summary style="cursor:pointer;font-size:12px;color:var(--red);font-weight:600">💬 ${replies.length} Balasan — lihat / tulis balasan</summary>
+          <div style="margin-top:8px">
+            ${repliesHtml}
+            <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+              <div class="form-group" style="margin-bottom:8px"><input type="text" id="reply-nama-${p.id}" placeholder="Nama (opsional)" maxlength="100"></div>
+              <div class="form-group" style="margin-bottom:8px"><textarea id="reply-pesan-${p.id}" placeholder="Tulis balasan..." maxlength="1000" style="min-height:50px"></textarea></div>
+              <div class="error-msg" id="reply-error-${p.id}" style="margin-top:0"></div>
+              <button class="btn btn-secondary" id="reply-submit-${p.id}">Kirim Balasan</button>
+            </div>
+          </div>
+        </details>
+      </div>`;
+  }
+
+  async function submitReply(postId) {
+    const errorEl = document.getElementById(`reply-error-${postId}`);
+    errorEl.textContent = "";
+    const nama = document.getElementById(`reply-nama-${postId}`).value.trim();
+    const pesan = document.getElementById(`reply-pesan-${postId}`).value.trim();
+    if (!pesan) { errorEl.textContent = "Balasan wajib diisi."; return; }
+
+    const btn = document.getElementById(`reply-submit-${postId}`);
+    btn.disabled = true; btn.textContent = "Mengirim...";
+    try {
+      await apiPublic("/api/kritik-saran", { method: "POST", body: JSON.stringify({ postId, nama, pesan }) });
+      await refreshFeed();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      // Elemen lama udah diganti innerHTML lewat refreshFeed(), jadi nggak perlu
+      // reset disabled/text manual di sini kalau berhasil — cuma relevan kalau error.
+      if (btn.isConnected) { btn.disabled = false; btn.textContent = "Kirim Balasan"; }
+    }
+  }
+
+  refreshFeed();
+</script>
+</body>
+</html>
