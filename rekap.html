@@ -26,6 +26,7 @@
       <button class="btn btn-secondary" id="tab-laporan">Verifikasi Laporan</button>
       <button class="btn btn-secondary" id="tab-promosi">Kenaikan Pangkat</button>
       <button class="btn btn-secondary" id="tab-pendaftaran">Pendaftaran</button>
+      <button class="btn btn-secondary" id="tab-kritiksaran">Kritik & Saran</button>
       <button class="btn btn-secondary" id="tab-users">Kelola Anggota</button>
     </div>
 
@@ -76,6 +77,19 @@
       </div>
     </div>
 
+    <div class="card" id="panel-kritiksaran" style="display:none">
+      <div class="sub" style="margin-bottom:10px">Kritik & saran yang dikirim warga lewat halaman publik <code>kritik-saran.html</code> (tanpa login) muncul di sini.
+        Kolom "IP Pengirim" cuma kelihatan di sini (nggak pernah ditampilin ke warga lain) — pakai ini kalau ada yang perlu ditelusuri karena disalahgunakan.</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Waktu</th><th>Kategori</th><th>Nama</th><th>Kontak</th><th>Pesan</th><th>IP Pengirim</th><th>Balasan</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="kritiksaran-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="panel-users" style="display:none">
       <div class="card">
         <h2>Tambah Anggota Baru</h2>
@@ -117,6 +131,16 @@
             <tbody id="users-body"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="balasan-modal">
+    <div class="modal-box" style="text-align:left;max-width:480px">
+      <h2 style="margin-bottom:14px">Balasan Warga</h2>
+      <div id="balasan-list" style="max-height:50vh;overflow-y:auto"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-secondary" id="balasan-close">Tutup</button>
       </div>
     </div>
   </div>
@@ -164,7 +188,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], allPromosi = [], currentUserId = null, periodeMulai = null;
+  let allUsers = [], allAbsensi = [], allPromosi = [], allKritikSaran = [], currentUserId = null, periodeMulai = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -202,9 +226,10 @@
     refreshUsers();
     refreshPromosi();
     refreshPendaftaran();
+    await refreshKritikSaran();
   }
 
-  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", promosi: "panel-promosi", pendaftaran: "panel-pendaftaran", users: "panel-users" };
+  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", promosi: "panel-promosi", pendaftaran: "panel-pendaftaran", kritiksaran: "panel-kritiksaran", users: "panel-users" };
   function switchTab(active) {
     Object.entries(tabs).forEach(([key, panelId]) => {
       document.getElementById(panelId).style.display = key === active ? "block" : "none";
@@ -215,7 +240,89 @@
   document.getElementById("tab-laporan").addEventListener("click", () => switchTab("laporan"));
   document.getElementById("tab-promosi").addEventListener("click", () => switchTab("promosi"));
   document.getElementById("tab-pendaftaran").addEventListener("click", () => switchTab("pendaftaran"));
+  document.getElementById("tab-kritiksaran").addEventListener("click", () => switchTab("kritiksaran"));
   document.getElementById("tab-users").addEventListener("click", () => switchTab("users"));
+
+  const KATEGORI_LABEL = { kritik: "Kritik", saran: "Saran", lainnya: "Lainnya" };
+
+  async function refreshKritikSaran() {
+    try {
+      const data = await api("/api/admin/kritik-saran");
+      allKritikSaran = data.list || [];
+    } catch (e) {
+      allKritikSaran = [];
+    }
+    const tbody = document.getElementById("kritiksaran-body");
+    if (!allKritikSaran.length) {
+      tbody.innerHTML = `<tr><td colspan="9" class="empty">Belum ada kritik/saran masuk.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = allKritikSaran.map((r) => {
+      const jumlahBalasan = (r.replies || []).length;
+      return `<tr>
+      <td style="white-space:nowrap;font-size:11px">${new Date(r.createdAt).toLocaleString("id-ID")}</td>
+      <td>${KATEGORI_LABEL[r.kategori] || r.kategori}</td>
+      <td>${r.nama || "<span class=\"empty\">Anonim</span>"}</td>
+      <td>${r.kontak || "-"}</td>
+      <td style="max-width:260px;white-space:pre-wrap">${r.pesan}</td>
+      <td style="font-size:11px;font-family:monospace;white-space:nowrap" title="Alamat IP pengirim, buat ditelusuri kalau disalahgunakan">${r.ip || "-"}</td>
+      <td><button class="btn-link" onclick="showBalasan('${r.id}')">Lihat (${jumlahBalasan})</button></td>
+      <td><span class="badge ${r.status === "ditindak" ? "diterima" : "pending"}">${r.status === "ditindak" ? "Ditindak" : "Baru"}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px;margin-right:4px" onclick="toggleStatusKritikSaran('${r.id}','${r.status === "ditindak" ? "baru" : "ditindak"}')">${r.status === "ditindak" ? "Tandai Baru" : "Tandai Ditindak"}</button>
+        <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px;background:#7c2d12;color:#fed7aa" onclick="hapusKritikSaran('${r.id}')">Hapus</button>
+      </td>
+    </tr>`;
+    }).join("");
+  }
+
+  function showBalasan(postId) {
+    const rec = allKritikSaran.find((r) => r.id === postId);
+    if (!rec) return;
+    const listEl = document.getElementById("balasan-list");
+    const replies = rec.replies || [];
+    listEl.innerHTML = replies.length
+      ? replies.map((rp) => `
+        <div style="border-bottom:1px solid var(--border);padding:8px 0">
+          <div style="font-size:12px;font-weight:700">${rp.nama || "Anonim"} <span style="font-weight:400;color:var(--faint);font-size:11px">· ${new Date(rp.createdAt).toLocaleString("id-ID")}</span></div>
+          <div style="font-size:11px;font-family:monospace;color:var(--faint)" title="Alamat IP pengirim balasan ini">IP: ${rp.ip || "-"}</div>
+          <div style="font-size:13px;white-space:pre-wrap;margin:4px 0 6px">${rp.pesan}</div>
+          <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px;background:#7c2d12;color:#fed7aa" onclick="hapusBalasan('${postId}','${rp.id}')">Hapus Balasan Ini</button>
+        </div>`).join("")
+      : `<div class="empty">Belum ada balasan.</div>`;
+    document.getElementById("balasan-modal").classList.add("open");
+  }
+  document.getElementById("balasan-close").addEventListener("click", () => document.getElementById("balasan-modal").classList.remove("open"));
+
+  async function hapusBalasan(postId, replyId) {
+    if (!confirm("Hapus balasan ini? Aksi ini tidak bisa dibatalkan.")) return;
+    try {
+      await api(`/api/admin/kritik-saran?id=${postId}&replyId=${replyId}`, { method: "DELETE" });
+      await refreshKritikSaran();
+      showBalasan(postId);
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function toggleStatusKritikSaran(id, status) {
+    try {
+      await api(`/api/admin/kritik-saran?id=${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await refreshKritikSaran();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function hapusKritikSaran(id) {
+    if (!confirm("Hapus kiriman ini? Aksi ini tidak bisa dibatalkan.")) return;
+    try {
+      await api(`/api/admin/kritik-saran?id=${id}`, { method: "DELETE" });
+      await refreshKritikSaran();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
 
   // Export tabel Rekap Anggota (jam kerja + hadir/izin/cuti/alpa) jadi file PDF,
   // pakai jsPDF + autoTable yang di-load lewat CDN di <head>.
