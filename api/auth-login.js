@@ -38,6 +38,7 @@ module.exports = async (req, res) => {
       isHighCommand: false,
       avatar: null,
       status: "pending", // wajib di-approve HC dulu sebelum bisa login
+      bergabung: new Date().toISOString().slice(0, 10),
     };
 
     try {
