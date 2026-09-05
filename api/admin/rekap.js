@@ -9,6 +9,7 @@ module.exports = async (req, res) => {
 
   const users = await kvStore.getUsers();
   const absensi = await kvStore.getAbsensi();
+  const periodeMulai = await kvStore.getPeriodeMulai();
 
   // Endpoint ini khusus High Command, jadi angka jam boleh ditampilkan apa
   // adanya (beda dari /api/me yang dipakai anggota biasa, yang cuma dapat
@@ -33,5 +34,5 @@ module.exports = async (req, res) => {
     };
   });
 
-  res.json({ users: users.map(sanitizeUser), absensi, promosi });
+  res.json({ users: users.map(sanitizeUser), absensi, promosi, periodeMulai });
 };
