@@ -631,3 +631,158 @@ textarea { resize: vertical; min-height: 60px; }
 @media (max-width: 640px) {
   .navbar .user .info { display: none; }
 }
+
+/* ====== Landing page (index.html): hero + banner iklan ====== */
+.landing-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  padding: 40px 24px;
+  flex-wrap: wrap;
+}
+
+/* --- Sisi kiri: hero + banner iklan --- */
+.landing-hero {
+  flex: 1 1 460px;
+  max-width: 520px;
+  animation: fadeSlideUp 0.5s ease both;
+}
+.landing-hero .badge-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 122, 162, 0.15);
+  border: 1px solid var(--border);
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.landing-hero .badge-live .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 0 rgba(255,122,162,0.5);
+  animation: glowPulse 1.8s infinite;
+}
+.landing-hero h1 {
+  font-size: 32px;
+  line-height: 1.15;
+  margin: 0 0 10px;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.landing-hero h1 span { color: var(--red); }
+.landing-hero .sub {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin-bottom: 24px;
+  max-width: 440px;
+}
+
+/* Stat mini strip */
+.landing-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+}
+.landing-stats .stat {
+  background: var(--card);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-width: 110px;
+}
+.landing-stats .stat b { display: block; font-size: 18px; color: var(--red); }
+.landing-stats .stat span { font-size: 11px; color: var(--faint); }
+
+/* Banner iklan / carousel berjalan otomatis */
+.ad-banner {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 40px rgba(255, 122, 162, 0.18);
+  height: 190px;
+}
+.ad-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px 26px;
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  pointer-events: none;
+}
+.ad-slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.ad-slide .tag {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,0.85);
+  color: var(--red);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+.ad-slide h3 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.ad-slide p {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.92);
+  line-height: 1.6;
+  max-width: 340px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.ad-slide.slide-1 { background: linear-gradient(135deg, #ff7aa2, #ff99cc); }
+.ad-slide.slide-2 { background: linear-gradient(135deg, #ff99cc, #ffb6c1); }
+.ad-slide.slide-3 { background: linear-gradient(135deg, #f76f99, #ff8fb3); }
+
+.ad-dots {
+  position: absolute;
+  bottom: 12px; left: 26px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+.ad-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  cursor: pointer;
+  transition: background 0.2s, width 0.2s;
+}
+.ad-dots span.active { background: #fff; width: 18px; border-radius: 4px; }
+
+/* --- Sisi kanan: kartu login (dipakein ulang style .login-card) --- */
+.landing-login { flex: 0 0 auto; }
+
+@media (max-width: 900px) {
+  .landing-wrap { padding: 28px 18px; }
+  .landing-hero { text-align: center; }
+  .landing-hero .sub { margin-left: auto; margin-right: auto; }
+  .landing-stats { justify-content: center; }
+  .landing-hero .badge-live { margin-left: auto; margin-right: auto; }
+}
