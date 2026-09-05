@@ -1,185 +1,151 @@
-// Kirim notifikasi ke Discord webhook tiap ada laporan absensi masuk.
-// Optional: kalau DISCORD_WEBHOOK_URL nggak diisi di Environment Variables,
-// fungsi ini cuma diam aja (nggak bikin error, nggak ganggu proses simpan
-// laporan).
+// Endpoint Arrest Record. Satu file numpang 4 method biar nggak nambah
+// jumlah serverless function (Vercel Hobby limit 12):
+//   GET    -> daftar arrest record (semua anggota boleh lihat)
+//   POST   -> submit BAP baru (semua anggota boleh bikin)
+//   PATCH  -> edit arrest record (KHUSUS High Command), pakai ?id=xxx
+//   DELETE -> hapus arrest record (KHUSUS High Command), pakai ?id=xxx
+const crypto = require("crypto");
+const kvStore = require("../lib/kv");
+const { getUserFromReq } = require("../lib/auth");
 
-const TIPE_LABEL = { hadir: "Hadir", izin: "Izin", cuti: "Cuti" };
-const TIPE_COLOR = { hadir: 0x22c55e, izin: 0xeab308, cuti: 0x3b82f6 };
+const MAX_ARRESTS_DISIMPAN = 500; // biar Redis nggak bengkak nggak terbatas
 
-function formatTanggalSingkat(iso) {
-  if (!iso) return "-";
-  try {
-    return new Date(iso + "T00:00:00").toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch (e) {
-    return iso;
-  }
-}
-
-// user: { username, pangkat }, record: hasil dari api/absensi.js (record baru)
-async function notifyLaporanMasuk(user, record) {
-  const url = process.env.DISCORD_WEBHOOK_URL;
-  if (!url) return; // fitur opsional — belum di-setup, skip diam-diam
-
-  const fields = [
-    { name: "Anggota", value: `${user.username} (${user.pangkat || "-"})`, inline: true },
-    { name: "Tipe", value: TIPE_LABEL[record.tipe] || record.tipe, inline: true },
-    { name: "Tanggal", value: formatTanggalSingkat(record.tanggal), inline: true },
-  ];
-
-  if (record.tipe === "hadir") {
-    fields.push({
-      name: "Jam Duty",
-      value: `${record.waktuMulai || "-"} - ${record.waktuSelesai || "-"}`,
-      inline: true,
-    });
-  }
-  if (record.tipe === "cuti") {
-    fields.push({
-      name: "Periode Cuti",
-      value: `${formatTanggalSingkat(record.cutiMulai)} s/d ${formatTanggalSingkat(record.cutiSelesai)}`,
-      inline: true,
-    });
-  }
-  if (record.keterangan) {
-    fields.push({ name: "Keterangan", value: String(record.keterangan).slice(0, 500), inline: false });
-  }
-
-  const payload = {
-    username: "Absensi Logs",
-    embeds: [
-      {
-        title: "Laporan Absensi Baru",
-        color: TIPE_COLOR[record.tipe] || 0x64748b,
-        fields,
-        footer: { text: `Status: ${record.status === "diterima" ? "auto-diterima (< 6 jam)" : "pending"} • ID: ${record.id}` },
-        timestamp: record.createdAt,
-      },
-    ],
-  };
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-  } catch (err) {
-    // Jangan sampai kegagalan kirim webhook bikin laporan gagal tersimpan —
-    // cukup dicatat di log server (Vercel → tab Logs).
-    console.error("[discord webhook] gagal kirim notifikasi:", err.message);
-  }
-}
-
-// user: yang submit laporan { username, pangkat }
-// hc: HC yang memutuskan { username }
-// record: laporan absensi yang statusnya baru diubah (sudah termasuk status & alasan terbaru)
-async function notifyStatusDiproses(user, hc, record) {
+async function kirimKeDiscord(arrest, fotoKtp) {
   const url = process.env.DISCORD_WEBHOOK_URL;
   if (!url) return;
 
-  const diterima = record.status === "diterima";
   const fields = [
-    { name: "Anggota", value: `${user.username} (${user.pangkat || "-"})`, inline: true },
-    { name: "Tipe", value: TIPE_LABEL[record.tipe] || record.tipe, inline: true },
-    { name: "Tanggal", value: formatTanggalSingkat(record.tanggal), inline: true },
-    { name: "Diproses oleh", value: hc.username, inline: true },
+    { name: "Nama Petugas", value: arrest.namaPetugas || "-", inline: true },
+    { name: "Umur Petugas", value: arrest.umurPetugas || "-", inline: true },
+    { name: "Divisi", value: arrest.divisiPetugas || "-", inline: true },
+    { name: "Pangkat", value: arrest.pangkatPetugas || "-", inline: true },
+    { name: "Nama Tersangka", value: arrest.namaTersangka, inline: true },
+    { name: "Umur Tersangka", value: arrest.umurTersangka || "-", inline: true },
+    { name: "Lokasi Penangkapan", value: arrest.lokasi || "-", inline: true },
   ];
-  if (!diterima && record.alasan) {
-    fields.push({ name: "Alasan Ditolak", value: String(record.alasan).slice(0, 500), inline: false });
+  if (arrest.ciriTersangka) fields.push({ name: "Ciri-Ciri Tersangka", value: arrest.ciriTersangka.slice(0, 500), inline: false });
+  if (arrest.pasalDipilih && arrest.pasalDipilih.length) {
+    fields.push({ name: "Pasal Dikenakan", value: arrest.pasalDipilih.join(", ").slice(0, 1000), inline: false });
   }
+  if (arrest.totalDenda) fields.push({ name: "Total Denda", value: arrest.totalDenda, inline: true });
+  fields.push({ name: "Kronologi Kejadian Perkara", value: arrest.kronologi, inline: false });
 
   const payload = {
-    username: "Absensi Logs",
-    embeds: [
-      {
-        title: diterima ? "Laporan Diterima" : "Laporan Ditolak",
-        color: diterima ? 0x22c55e : 0xef4444,
-        fields,
-        footer: { text: `ID: ${record.id}` },
-        timestamp: new Date().toISOString(),
-      },
-    ],
+    username: "Arrest Record",
+    embeds: [{ title: "🚔 Arrest Record Baru", color: 0xff7aa2, fields, footer: { text: `ID Perkara: ${arrest.id}` }, timestamp: arrest.tanggal }],
   };
 
   try {
+    const form = new FormData();
+    form.append("payload_json", JSON.stringify(payload));
+    if (Array.isArray(fotoKtp)) {
+      fotoKtp.slice(0, 2).forEach((dataUrl, i) => {
+        const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl || "");
+        if (!match) return;
+        const buffer = Buffer.from(match[2], "base64");
+        const ext = match[1].split("/")[1] || "jpg";
+        form.append(`file${i}`, new Blob([buffer], { type: match[1] }), `ktp${i}.${ext}`);
+      });
+    }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    await fetch(url, { method: "POST", body: form, signal: controller.signal });
     clearTimeout(timeout);
   } catch (err) {
-    console.error("[discord webhook] gagal kirim notifikasi status:", err.message);
+    console.error("[arrest] gagal kirim ke Discord (berkas tetap tersimpan):", err.message);
   }
 }
 
-// Helper generik kirim embed ke webhook — dipakai notifyKlaimGaji &
-// notifyPendaftaranBaru biar nggak duplikat kode fetch+try/catch.
-async function kirimEmbed(payload) {
-  const url = process.env.DISCORD_WEBHOOK_URL;
-  if (!url) return;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-  } catch (err) {
-    console.error("[discord webhook] gagal kirim notifikasi:", err.message);
+module.exports = async (req, res) => {
+  const user = await getUserFromReq(req);
+  if (!user) return res.status(401).json({ error: "Belum login." });
+
+  // ====== GET: daftar arrest record ======
+  if (req.method === "GET") {
+    const arrests = await kvStore.getArrests();
+    return res.json({ arrests: arrests.slice(0, MAX_ARRESTS_DISIMPAN) });
   }
-}
 
-// Dipanggil tiap anggota klaim gaji mingguan.
-async function notifyKlaimGaji(user, jam, jumlah) {
-  await kirimEmbed({
-    username: "Gaji Logs",
-    embeds: [
-      {
-        title: "💰 Klaim Gaji Mingguan",
-        color: 0x22c55e,
-        fields: [
-          { name: "Anggota", value: `${user.username} (${user.pangkat || "-"})`, inline: true },
-          { name: "Jam Duty Terverifikasi", value: `${jam.toFixed(1)} Jam`, inline: true },
-          { name: "Jumlah Diklaim", value: `Rp ${Number(jumlah).toLocaleString("id-ID")}`, inline: true },
-        ],
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  });
-}
+  // ====== POST: submit BAP baru ======
+  if (req.method === "POST") {
+    const {
+      namaPetugas, umurPetugas, divisiPetugas,
+      namaTersangka, umurTersangka, ciriTersangka, lokasi,
+      kronologi, pasalDipilih, totalDenda, fotoKtp,
+    } = req.body || {};
 
-// Dipanggil tiap ada pendaftaran akun baru (menunggu approval High Command).
-async function notifyPendaftaranBaru(pendaftar) {
-  await kirimEmbed({
-    username: "Pendaftaran Logs",
-    embeds: [
-      {
-        title: "🆕 Pendaftaran Akun Baru — Menunggu Approval",
-        color: 0xeab308,
-        fields: [
-          { name: "Username", value: pendaftar.username, inline: true },
-          { name: "Nama Karakter", value: pendaftar.namaKarakter || "-", inline: true },
-        ],
-        footer: { text: "Buka Panel Rekap → tab Pendaftaran untuk approve/reject." },
-        timestamp: new Date().toISOString(),
-      },
-    ],
-  });
-}
+    if (!namaTersangka || !kronologi) {
+      return res.status(400).json({ error: "Nama tersangka & kronologi kejadian wajib diisi." });
+    }
 
-module.exports = { notifyLaporanMasuk, notifyStatusDiproses, notifyKlaimGaji, notifyPendaftaranBaru };
+    const arrest = {
+      id: crypto.randomBytes(8).toString("hex"),
+      tanggal: new Date().toISOString(),
+      // Data petugas — dari form (bukan cuma username akun), pangkat tetap
+      // diambil dari akun yang login (nggak bisa diisi manual/dipalsu).
+      dibuatOlehUserId: user.id,
+      namaPetugas: namaPetugas ? String(namaPetugas).slice(0, 100) : user.username,
+      umurPetugas: umurPetugas ? String(umurPetugas).slice(0, 10) : "",
+      divisiPetugas: divisiPetugas ? String(divisiPetugas).slice(0, 100) : "",
+      pangkatPetugas: user.pangkat || "-",
+      // Data tersangka
+      namaTersangka: String(namaTersangka).slice(0, 150),
+      umurTersangka: umurTersangka ? String(umurTersangka).slice(0, 10) : "",
+      ciriTersangka: ciriTersangka ? String(ciriTersangka).slice(0, 500) : "",
+      lokasi: lokasi ? String(lokasi).slice(0, 200) : "",
+      // Kasus
+      kronologi: String(kronologi).slice(0, 1000),
+      pasalDipilih: Array.isArray(pasalDipilih) ? pasalDipilih.slice(0, 20) : [],
+      totalDenda: totalDenda ? String(totalDenda) : "-",
+      // Foto KTP DISIMPAN (beda dari sebelumnya) karena ini bukti utama
+      // identitas tersangka yang perlu dilihat lagi lewat "Lihat Detail" —
+      // dibatasi maks 2 gambar & sudah dikompres dari sisi client.
+      fotoKtp: Array.isArray(fotoKtp) ? fotoKtp.slice(0, 2) : [],
+    };
+
+    try {
+      const arrests = await kvStore.getArrests();
+      arrests.unshift(arrest);
+      await kvStore.setArrests(arrests.slice(0, MAX_ARRESTS_DISIMPAN));
+    } catch (err) {
+      console.error("[arrest] gagal simpan ke database:", err.message);
+      return res.status(500).json({ error: `Gagal menyimpan berkas: ${err.message}` });
+    }
+
+    await kirimKeDiscord(arrest, arrest.fotoKtp);
+    return res.json({ ok: true, arrest });
+  }
+
+  // ====== PATCH & DELETE: khusus High Command ======
+  if (req.method === "PATCH" || req.method === "DELETE") {
+    if (!user.isHighCommand) return res.status(403).json({ error: "Cuma High Command yang bisa edit/hapus arrest record." });
+
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: "ID arrest record wajib disertakan." });
+
+    const arrests = await kvStore.getArrests();
+    const idx = arrests.findIndex((a) => a.id === id);
+    if (idx === -1) return res.status(404).json({ error: "Arrest record tidak ditemukan." });
+
+    if (req.method === "DELETE") {
+      arrests.splice(idx, 1);
+      await kvStore.setArrests(arrests);
+      return res.json({ ok: true });
+    }
+
+    // PATCH — HC boleh ubah field apa pun kecuali id/tanggal/dibuatOlehUserId
+    const body = req.body || {};
+    const editable = [
+      "namaPetugas", "umurPetugas", "divisiPetugas", "pangkatPetugas",
+      "namaTersangka", "umurTersangka", "ciriTersangka", "lokasi",
+      "kronologi", "pasalDipilih", "totalDenda", "fotoKtp",
+    ];
+    editable.forEach((key) => {
+      if (body[key] !== undefined) arrests[idx][key] = body[key];
+    });
+    await kvStore.setArrests(arrests);
+    return res.json({ ok: true, arrest: arrests[idx] });
+  }
+
+  res.status(405).json({ error: "Method tidak didukung." });
+};
