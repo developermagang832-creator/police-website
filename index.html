@@ -8,24 +8,65 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="flag">🚔</div>
-      <h1>KEPOLISIAN NEXOTIS</h1>
-      <p>Masuk dengan akun yang diberikan Petinggi. Belum punya akun? <a href="register.html" style="color: red; font-weight: bold;">Daftar di sini</a>.</p>
-  
-      <div class="form-group" style="text-align:left">
-        <label for="username">Username</label>
-        <input type="text" id="username" placeholder="username kamu" autocomplete="username">
+  <div class="landing-wrap">
+
+    <!-- ===== Hero + banner iklan (sisi publik) ===== -->
+    <div class="landing-hero">
+      <div class="badge-live"><span class="dot"></span> SEDANG BERTUGAS 24 JAM</div>
+      <h1>Melindungi & Melayani<br><span>Kota Nexotis</span></h1>
+      <p class="sub">Portal resmi Kepolisian Nexotis — pusat absensi, laporan tugas, rekap kinerja, dan struktur jabatan anggota. Jaga kota tetap aman, satu laporan pada satu waktu.</p>
+
+      <div class="landing-stats">
+        <div class="stat"><b>24/7</b><span>Siaga Patroli</span></div>
+        <div class="stat"><b>100%</b><span>Laporan Digital</span></div>
+        <div class="stat"><b>Cepat</b><span>Respons Tugas</span></div>
       </div>
-      <div class="form-group" style="text-align:left">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="password kamu" autocomplete="current-password">
+
+      <div class="ad-banner" id="ad-banner">
+        <div class="ad-slide slide-1 active">
+          <span class="tag">Pendaftaran Dibuka</span>
+          <h3>Gabung Jadi Anggota Baru!</h3>
+          <p>Punya jiwa disiplin dan mau jaga keamanan kota? Daftar sekarang dan mulai kariermu di Kepolisian Nexotis.</p>
+        </div>
+        <div class="ad-slide slide-2">
+          <span class="tag">Info</span>
+          <h3>Absensi Kini Lebih Mudah</h3>
+          <p>Laporan hadir, izin, dan cuti bisa langsung dikirim lewat dashboard — lengkap dengan bukti foto.</p>
+        </div>
+        <div class="ad-slide slide-3">
+          <span class="tag">Kenaikan Pangkat</span>
+          <h3>Kinerja Dipantau, Pangkat Naik</h3>
+          <p>Jam tugas kamu tercatat otomatis dan jadi dasar penilaian kenaikan pangkat oleh High Command.</p>
+        </div>
+        <div class="ad-dots">
+          <span class="active" data-i="0"></span>
+          <span data-i="1"></span>
+          <span data-i="2"></span>
+        </div>
       </div>
-      <button class="btn btn-primary" style="width:100%" id="login-btn">Masuk</button>
-      <div class="error-msg" id="error-msg"></div>
-      <div class="foot">© 2026 Kepolisian Nexotis</div>
     </div>
+
+    <!-- ===== Kartu login ===== -->
+    <div class="landing-login">
+      <div class="login-card">
+        <div class="flag">🚔</div>
+        <h1>KEPOLISIAN NEXOTIS</h1>
+        <p>Masuk dengan akun yang diberikan Petinggi. Belum punya akun? <a href="register.html" style="color: red; font-weight: bold;">Daftar di sini</a>.</p>
+
+        <div class="form-group" style="text-align:left">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="username kamu" autocomplete="username">
+        </div>
+        <div class="form-group" style="text-align:left">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="password kamu" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="login-btn">Masuk</button>
+        <div class="error-msg" id="error-msg"></div>
+        <div class="foot">© 2026 Kepolisian Nexotis</div>
+      </div>
+    </div>
+
   </div>
 
 <script src="app.js"></script>
@@ -57,6 +98,29 @@
       btn.disabled = false; btn.textContent = "Masuk";
     }
   }
+
+  // ====== Carousel banner iklan (auto-geser tiap 4 detik) ======
+  (function () {
+    const slides = document.querySelectorAll("#ad-banner .ad-slide");
+    const dots = document.querySelectorAll("#ad-banner .ad-dots span");
+    let i = 0, timer = null;
+
+    function show(n) {
+      slides.forEach((s, idx) => s.classList.toggle("active", idx === n));
+      dots.forEach((d, idx) => d.classList.toggle("active", idx === n));
+      i = n;
+    }
+    function next() { show((i + 1) % slides.length); }
+    function startAuto() { timer = setInterval(next, 4000); }
+    function stopAuto() { clearInterval(timer); }
+
+    dots.forEach((d) => d.addEventListener("click", () => { show(Number(d.dataset.i)); stopAuto(); startAuto(); }));
+    const banner = document.getElementById("ad-banner");
+    banner.addEventListener("mouseenter", stopAuto);
+    banner.addEventListener("mouseleave", startAuto);
+
+    startAuto();
+  })();
 </script>
 </body>
 </html>
