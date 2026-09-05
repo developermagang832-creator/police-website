@@ -19,6 +19,7 @@
       <div class="stat-card hours">
         <div class="label">Total Akumulasi Jam Kerja</div>
         <div class="value" id="stat-jam">0.00 Jam</div>
+        <div class="sub" id="periode-label" style="font-size:12px;opacity:.75;margin-top:4px"></div>
       </div>
     </div>
 
@@ -111,7 +112,7 @@
 
 <script src="app.js"></script>
 <script>
-  let user, myRecords = [];
+  let user, myRecords = [], periodeMulai = null;
 
   (async function init() {
     user = await requireAuth();
@@ -126,13 +127,17 @@
   async function refreshAll() {
     const data = await api("/api/absensi");
     myRecords = data.absensi;
+    periodeMulai = data.periodeMulai;
     refreshStats();
     refreshRiwayat();
   }
 
   function refreshStats() {
-    const s = calcStatsFromRecords(myRecords);
+    const mulai = effectiveMulai(periodeMulai, user.bergabung);
+    const s = calcStatsFromRecords(myRecords, mulai);
     document.getElementById("stat-jam").textContent = s.totalJam.toFixed(2) + " Jam";
+    const periodeLabel = document.getElementById("periode-label");
+    if (periodeLabel) periodeLabel.textContent = `Sejak ${formatTanggal(mulai)} (reset manual oleh High Command)`;
     document.getElementById("pill-hadir").textContent = s.hadir;
     document.getElementById("pill-izin").textContent = s.izin;
     document.getElementById("pill-cuti").textContent = s.cuti;
