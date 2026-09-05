@@ -51,6 +51,7 @@ module.exports = async (req, res) => {
     isHighCommand: true,
     avatar: null,
     status: "approved",
+    bergabung: new Date().toISOString().slice(0, 10),
   };
 
   try {
