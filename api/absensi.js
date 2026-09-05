@@ -47,7 +47,8 @@ module.exports = async (req, res) => {
   const absensiAll = await kvStore.getAbsensi();
 
   if (req.method === "GET") {
-    return res.json({ absensi: absensiAll.filter((a) => a.userId === user.id) });
+    const periodeMulai = await kvStore.getPeriodeMulai();
+    return res.json({ absensi: absensiAll.filter((a) => a.userId === user.id), periodeMulai });
   }
 
   if (req.method === "POST") {
