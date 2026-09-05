@@ -74,31 +74,47 @@ function diffMinutes(mulai, selesai) {
   return mins;
 }
 
-// Hitung statistik mingguan dari daftar record absensi.
-function calcStatsFromRecords(records) {
-  const week = getWeekDates();
+// Hitung statistik akumulasi (jam kerja/hadir/izin/cuti/alpa) dari daftar
+// record absensi, terhitung sejak `mulaiIso` (bukan Senin-Minggu kalender
+// yang berjalan otomatis) sampai hari ini. Angkanya numpuk terus dan CUMA
+// balik ke 0 kalau High Command klik "Reset Semua Duty" di Panel Rekap —
+// itu yang menggeser `mulaiIso` (periodeMulai) ke tanggal reset.
+// mulaiIso wajib diisi caller (ambil dari periodeMulai API, di-max-kan sama
+// tanggal bergabung anggota kalau dia baru gabung setelah periode dimulai).
+function calcStatsFromRecords(records, mulaiIso) {
   const todayStr = toISO(new Date());
+  const mulai = mulaiIso || todayStr;
+  const rangeDates = eachDateInRange(mulai, todayStr);
+  const rangeSet = new Set(rangeDates);
   const hadirDays = new Set(), izinDays = new Set(), cutiDays = new Set();
   let totalMinutes = 0;
 
   records.forEach((a) => {
     if (a.status !== "diterima") return; // pending & ditolak nggak ikut dihitung
-    if (a.tipe === "hadir" && week.includes(a.tanggal)) {
+    if (a.tipe === "hadir" && rangeSet.has(a.tanggal)) {
       hadirDays.add(a.tanggal);
       if (a.waktuMulai && a.waktuSelesai) totalMinutes += diffMinutes(a.waktuMulai, a.waktuSelesai);
-    } else if (a.tipe === "izin" && week.includes(a.tanggal)) {
+    } else if (a.tipe === "izin" && rangeSet.has(a.tanggal)) {
       izinDays.add(a.tanggal);
     } else if (a.tipe === "cuti") {
-      eachDateInRange(a.cutiMulai, a.cutiSelesai).forEach((d) => { if (week.includes(d)) cutiDays.add(d); });
+      eachDateInRange(a.cutiMulai, a.cutiSelesai).forEach((d) => { if (rangeSet.has(d)) cutiDays.add(d); });
     }
   });
 
-  const elapsedWeekdays = week.filter((d) => d <= todayStr && isWeekday(d));
+  const elapsedWeekdays = rangeDates.filter((d) => d <= todayStr && isWeekday(d));
   let alpa = 0;
   elapsedWeekdays.forEach((d) => { if (!hadirDays.has(d) && !izinDays.has(d) && !cutiDays.has(d)) alpa++; });
 
   const totalJam = totalMinutes / 60;
   return { totalJam, hadir: hadirDays.size, izin: izinDays.size, cuti: cutiDays.size, alpa };
+}
+
+// Tanggal efektif mulai hitung buat 1 anggota: yang lebih baru antara mulainya
+// periode global (periodeMulai) sama tanggal dia gabung — biar anggota yang
+// baru gabung di tengah periode nggak keitung "alpa" buat hari sebelum dia ada.
+function effectiveMulai(periodeMulai, bergabung) {
+  if (bergabung && bergabung > periodeMulai) return bergabung;
+  return periodeMulai;
 }
 
 // Teks berjalan di bawah navbar — gaya kayak website instansi resmi (mis.
