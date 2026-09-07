@@ -1,7 +1,6 @@
 const kvStore = require("../../../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../../../lib/auth");
 const { hashPassword } = require("../../../lib/password");
-const { getNextPangkatInfo, getEffectivePromoJam } = require("../../../lib/promosi");
 
 module.exports = async (req, res) => {
   try {
@@ -15,23 +14,7 @@ module.exports = async (req, res) => {
     if (!target) return res.status(404).json({ error: "User tidak ditemukan." });
 
     if (req.method === "PATCH") {
-      const { pangkat, isHighCommand, newPassword, terimaKenaikan, status } = req.body || {};
-
-      // Aksi "Terima Kenaikan" dari tab Kenaikan Pangkat di Panel Rekap —
-      // numpang di endpoint edit-user yang sudah ada (bukan endpoint baru)
-      // biar jumlah serverless function tidak nambah.
-      if (terimaKenaikan) {
-        const next = getNextPangkatInfo(target.pangkat);
-        if (!next) return res.status(400).json({ error: "Anggota sudah di pangkat tertinggi." });
-        const jamSaatIni = getEffectivePromoJam(target);
-        if (next.jam && jamSaatIni < next.jam) {
-          return res.status(400).json({ error: "Syarat jam anggota ini belum terpenuhi." });
-        }
-        target.pangkat = next.pangkat;
-        target.promoJam = 0; // reset, mulai progress baru buat pangkat berikutnya lagi
-        await kvStore.setUsers(users);
-        return res.json({ ok: true, user: sanitizeUser(target) });
-      }
+      const { pangkat, isHighCommand, newPassword, status } = req.body || {};
 
       // Approve/reject pendaftaran akun baru dari tab Pendaftaran di Panel
       // Rekap — juga numpang di endpoint ini, bukan endpoint baru.
