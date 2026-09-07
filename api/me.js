@@ -1,6 +1,6 @@
 const kvStore = require("../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../lib/auth");
-const { getNextPangkatInfo, getEffectivePromoJam, PANGKAT_LIST } = require("../lib/promosi");
+const { PANGKAT_LIST } = require("../lib/pangkat");
 const { TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, klaimGaji } = require("../lib/gaji");
 const { notifyKlaimGaji } = require("../lib/discord");
 
@@ -9,15 +9,33 @@ const { notifyKlaimGaji } = require("../lib/discord");
 // bawah ini — batas ini cuma jaga-jaga biar Redis nggak kebanjiran data.
 const MAX_AVATAR_CHARS = 500 * 1024;
 
-function buildPromosiInfo(user) {
-  const next = getNextPangkatInfo(user.pangkat);
-  if (!next) return { maxed: true };
-  const jamSaatIni = getEffectivePromoJam(user);
-  const persenMentah = next.jam ? (jamSaatIni / next.jam) * 100 : 100;
-  const persen = Math.min(100, Math.round(persenMentah * 10) / 10);
-  // Sengaja TIDAK kirim jamSaatIni/next.jam mentah ke anggota — cuma nama
-  // pangkat berikutnya, syarat non-angka, dan persentase progress.
-  return { maxed: false, pangkatBerikutnya: next.pangkat, syarat: next.syarat, persen, tercapai: persen >= 100 };
+// Tanggal efektif mulai hitung buat 1 anggota: yang lebih baru antara
+// mulainya periode global (periodeMulai) sama tanggal dia gabung.
+function effectiveMulai(periodeMulai, bergabung) {
+  if (bergabung && bergabung > periodeMulai) return bergabung;
+  return periodeMulai;
+}
+
+// Total jam duty (laporan "hadir" berstatus "diterima") + jumlah hari hadir
+// sejak `mulaiIso` sampai hari ini — dipakai buat Leaderboard dashboard.
+function calcTotalJamHadir(records, mulaiIso) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const mulai = mulaiIso || todayStr;
+  let totalMinutes = 0;
+  const hadirDays = new Set();
+  records.forEach((a) => {
+    if (a.status !== "diterima" || a.tipe !== "hadir") return;
+    if (a.tanggal < mulai || a.tanggal > todayStr) return;
+    hadirDays.add(a.tanggal);
+    if (a.waktuMulai && a.waktuSelesai) {
+      const [h1, m1] = a.waktuMulai.split(":").map(Number);
+      const [h2, m2] = a.waktuSelesai.split(":").map(Number);
+      let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+      if (mins < 0) mins += 24 * 60;
+      totalMinutes += mins;
+    }
+  });
+  return { totalJam: totalMinutes / 60, hadir: hadirDays.size };
 }
 
 module.exports = async (req, res) => {
@@ -51,6 +69,36 @@ module.exports = async (req, res) => {
         return a.username.localeCompare(b.username);
       });
     return res.json({ members });
+  }
+
+  // ====== Aksi: leaderboard jam duty (buat dashboard) ======
+  // Numpang di GET /api/me?view=leaderboard — dipakai dashboard.html biar
+  // langsung kelihatan tiap kali dibuka/di-refresh. Top 5 berdasarkan total
+  // jam duty terverifikasi di periode berjalan (reset ikut "Reset Semua Duty").
+  if (req.method === "GET" && req.query && req.query.view === "leaderboard") {
+    const users = await kvStore.getUsers();
+    const absensi = await kvStore.getAbsensi();
+    const periodeMulai = await kvStore.getPeriodeMulai();
+    const board = users
+      .filter((u) => (u.status || "approved") === "approved")
+      .map((u) => {
+        const records = absensi.filter((a) => a.userId === u.id);
+        const mulai = effectiveMulai(periodeMulai, u.bergabung);
+        const { totalJam, hadir } = calcTotalJamHadir(records, mulai);
+        return {
+          id: u.id,
+          username: u.username,
+          namaKarakter: u.namaKarakter || "",
+          pangkat: u.pangkat,
+          avatar: u.avatar || null,
+          totalJam: Math.round(totalJam * 10) / 10,
+          hadir,
+        };
+      })
+      .filter((r) => r.totalJam > 0)
+      .sort((a, b) => b.totalJam - a.totalJam || b.hadir - a.hadir)
+      .slice(0, 5);
+    return res.json({ leaderboard: board, periodeMulai });
   }
 
   if (req.method === "POST") {
@@ -103,9 +151,8 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Aksi tidak dikenal." });
   }
 
-  // ====== GET profil + progress kenaikan pangkat + info gaji ======
+  // ====== GET profil + info gaji ======
   const sanitized = sanitizeUser(user);
-  sanitized.promosi = buildPromosiInfo(user);
   sanitized.gaji = {
     tabel: TABEL_GAJI,
     gajiSaya: getGajiPangkat(user.pangkat),
