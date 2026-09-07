@@ -2,32 +2,7 @@ const crypto = require("crypto");
 const kvStore = require("../lib/kv");
 const { getUserFromReq } = require("../lib/auth");
 const { notifyLaporanMasuk } = require("../lib/discord");
-
-// Upload 1 foto (data URL base64 dari browser) ke Cloudinary, balikin URL publiknya.
-// Cloudinary punya free tier yang gak minta kartu kredit sama sekali. Ini yang bikin
-// Redis nggak lagi kebanjiran base64 raksasa — yang disimpan di Redis nanti cuma
-// URL pendek, foto aslinya duduk di Cloudinary.
-async function uploadFotoKeCloudinary(dataUrl, absensiId, index) {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
-  if (!cloudName || !uploadPreset) {
-    throw new Error("CLOUDINARY_CLOUD_NAME / CLOUDINARY_UPLOAD_PRESET belum di-set.");
-  }
-  const form = new URLSearchParams();
-  form.append("file", dataUrl); // Cloudinary terima data URL base64 langsung
-  form.append("upload_preset", uploadPreset);
-  form.append("public_id", `absensi/${absensiId}-${index}`);
-
-  const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-    method: "POST",
-    body: form,
-  });
-  const json = await resp.json();
-  if (!resp.ok || !json.secure_url) {
-    throw new Error(json?.error?.message || "Upload ke Cloudinary gagal.");
-  }
-  return json.secure_url;
-}
+const { uploadFotoKeCloudinary } = require("../lib/cloudinary");
 
 // Durasi duty dalam jam dari "HH:MM" ke "HH:MM" (menangani lewat tengah malam).
 function calcDurasiJam(mulai, selesai) {
@@ -85,7 +60,7 @@ module.exports = async (req, res) => {
     let fotoUrls = [];
     try {
       fotoUrls = await Promise.all(
-        fotoList.map((dataUrl, i) => uploadFotoKeCloudinary(dataUrl, absensiId, i))
+        fotoList.map((dataUrl, i) => uploadFotoKeCloudinary(dataUrl, `absensi/${absensiId}-${i}`))
       );
     } catch (e) {
       return res.status(500).json({ error: "Gagal mengunggah foto: " + e.message });
