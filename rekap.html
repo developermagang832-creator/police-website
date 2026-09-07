@@ -24,7 +24,6 @@
     <div class="tabs">
       <button class="btn btn-primary" id="tab-rekap">Rekap Anggota</button>
       <button class="btn btn-secondary" id="tab-laporan">Verifikasi Laporan</button>
-      <button class="btn btn-secondary" id="tab-promosi">Kenaikan Pangkat</button>
       <button class="btn btn-secondary" id="tab-pendaftaran">Pendaftaran</button>
       <button class="btn btn-secondary" id="tab-users">Kelola Anggota</button>
     </div>
@@ -50,18 +49,6 @@
             <tr><th>Anggota</th><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Bukti</th><th>Status</th><th>Aksi</th></tr>
           </thead>
           <tbody id="laporan-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card" id="panel-promosi" style="display:none">
-      <div class="sub" style="margin-bottom:10px">Anggota yang sudah memenuhi syarat jam bisa langsung diterima naik pangkat dari sini.</div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead>
-            <tr><th>Anggota</th><th>Pangkat Sekarang</th><th>Pangkat Berikutnya</th><th>Progress</th><th>Aksi</th></tr>
-          </thead>
-          <tbody id="promosi-body"></tbody>
         </table>
       </div>
     </div>
@@ -164,7 +151,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], allPromosi = [], currentUserId = null, periodeMulai = null;
+  let allUsers = [], allAbsensi = [], currentUserId = null, periodeMulai = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -187,24 +174,28 @@
     currentUserId = user.id;
     renderNavbar("rekap", user);
     await refreshAll();
+
+    // Deep-link dari notifikasi Discord (?tab=laporan / ?tab=pendaftaran) —
+    // biar High Command bisa langsung nyampe ke tab yang relevan dari HP
+    // tanpa perlu klik-klik cari tab-nya manual.
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam && tabs[tabParam]) switchTab(tabParam);
   })();
 
   async function refreshAll() {
     const data = await api("/api/admin/rekap");
     allUsers = data.users;
     allAbsensi = data.absensi;
-    allPromosi = data.promosi;
     periodeMulai = data.periodeMulai;
     const periodeLabelEl = document.getElementById("periode-label");
     if (periodeLabelEl) periodeLabelEl.textContent = `Periode berjalan sejak ${formatTanggal(periodeMulai)} — klik "Reset Semua Duty" untuk mulai periode baru.`;
     refreshRekap();
     refreshLaporan();
     refreshUsers();
-    refreshPromosi();
     refreshPendaftaran();
   }
 
-  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", promosi: "panel-promosi", pendaftaran: "panel-pendaftaran", users: "panel-users" };
+  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", pendaftaran: "panel-pendaftaran", users: "panel-users" };
   function switchTab(active) {
     Object.entries(tabs).forEach(([key, panelId]) => {
       document.getElementById(panelId).style.display = key === active ? "block" : "none";
@@ -213,7 +204,6 @@
   }
   document.getElementById("tab-rekap").addEventListener("click", () => switchTab("rekap"));
   document.getElementById("tab-laporan").addEventListener("click", () => switchTab("laporan"));
-  document.getElementById("tab-promosi").addEventListener("click", () => switchTab("promosi"));
   document.getElementById("tab-pendaftaran").addEventListener("click", () => switchTab("pendaftaran"));
   document.getElementById("tab-users").addEventListener("click", () => switchTab("users"));
 
@@ -300,40 +290,6 @@
     if (alasan === null) return; // batal
     try {
       await api(`/api/admin/laporan/${id}`, { method: "POST", body: JSON.stringify({ status: "ditolak", alasan }) });
-      await refreshAll();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  function refreshPromosi() {
-    const tbody = document.getElementById("promosi-body");
-    const rows = allPromosi || [];
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty">Belum ada anggota.</td></tr>`; return; }
-    tbody.innerHTML = rows.map((r) => {
-      if (r.maxed) {
-        return `<tr><td>${r.username}</td><td>${r.pangkat}</td><td colspan="3" class="empty">Sudah pangkat tertinggi</td></tr>`;
-      }
-      const aksi = r.tercapai
-        ? `<button class="btn btn-primary" style="padding:5px 10px;font-size:11px" onclick="terimaPromosi('${r.id}','${r.username.replace(/'/g, "\\'")}','${r.pangkatBerikutnya}')">Terima Kenaikan</button>`
-        : `<span style="font-size:11px;color:var(--faint)">Belum memenuhi syarat</span>`;
-      return `<tr>
-        <td>${r.username}</td>
-        <td>${r.pangkat}</td>
-        <td>${r.pangkatBerikutnya}</td>
-        <td>
-          <div class="promo-progress-bar" style="width:110px"><div class="promo-progress-fill ${r.tercapai ? "selesai" : ""}" style="width:${r.persen}%"></div></div>
-          <div style="font-size:11px;color:var(--faint);margin-top:4px">${r.jamSaatIni} / ${r.jamDibutuhkan} Jam</div>
-        </td>
-        <td>${aksi}</td>
-      </tr>`;
-    }).join("");
-  }
-
-  async function terimaPromosi(id, username, pangkatBaru) {
-    if (!confirm(`Naikkan pangkat ${username} jadi ${pangkatBaru}?`)) return;
-    try {
-      await api(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ terimaKenaikan: true }) });
       await refreshAll();
     } catch (e) {
       alert(e.message);
