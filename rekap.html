@@ -26,6 +26,7 @@
       <button class="btn btn-secondary" id="tab-laporan">Verifikasi Laporan</button>
       <button class="btn btn-secondary" id="tab-pendaftaran">Pendaftaran</button>
       <button class="btn btn-secondary" id="tab-users">Kelola Anggota</button>
+      <button class="btn btn-secondary" id="tab-iklan">Iklan</button>
     </div>
 
     <div class="card" id="panel-rekap">
@@ -106,6 +107,36 @@
         </div>
       </div>
     </div>
+
+    <div id="panel-iklan" style="display:none">
+      <div class="card">
+        <h2>Tambah Iklan</h2>
+        <div class="sub" style="margin-bottom:10px">Iklan (foto + teks) yang kamu tambahkan di sini bakal tampil di Dashboard semua anggota.</div>
+
+        <div class="form-group">
+          <label>Foto Iklan (opsional)</label>
+          <div id="iklan-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s ease,background .2s ease;">
+            <div style="font-size:24px;margin-bottom:6px">🖼️</div>
+            <div style="font-size:12px;color:var(--muted)">Tarik &amp; lepas foto di sini, atau klik untuk pilih 1 foto</div>
+            <input type="file" id="iklan-foto" accept="image/*" style="display:none">
+          </div>
+          <div id="iklan-foto-preview" style="margin-top:10px"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="iklan-teks">Teks Iklan</label>
+          <textarea id="iklan-teks" placeholder="Tulis isi iklan / pengumuman di sini..."></textarea>
+        </div>
+
+        <div class="error-msg" id="iklan-error"></div>
+        <button class="btn btn-primary" id="iklan-submit">Tambah Iklan</button>
+      </div>
+
+      <div class="card">
+        <h2>Daftar Iklan Aktif</h2>
+        <div id="iklan-list" style="display:flex;flex-direction:column;gap:12px"></div>
+      </div>
+    </div>
   </div>
 
   <div class="modal-overlay" id="foto-modal">
@@ -151,7 +182,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], currentUserId = null, periodeMulai = null;
+  let allUsers = [], allAbsensi = [], allIklan = [], currentUserId = null, periodeMulai = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -186,6 +217,7 @@
     const data = await api("/api/admin/rekap");
     allUsers = data.users;
     allAbsensi = data.absensi;
+    allIklan = data.iklan || [];
     periodeMulai = data.periodeMulai;
     const periodeLabelEl = document.getElementById("periode-label");
     if (periodeLabelEl) periodeLabelEl.textContent = `Periode berjalan sejak ${formatTanggal(periodeMulai)} — klik "Reset Semua Duty" untuk mulai periode baru.`;
@@ -193,9 +225,10 @@
     refreshLaporan();
     refreshUsers();
     refreshPendaftaran();
+    refreshIklan();
   }
 
-  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", pendaftaran: "panel-pendaftaran", users: "panel-users" };
+  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", pendaftaran: "panel-pendaftaran", users: "panel-users", iklan: "panel-iklan" };
   function switchTab(active) {
     Object.entries(tabs).forEach(([key, panelId]) => {
       document.getElementById(panelId).style.display = key === active ? "block" : "none";
@@ -206,6 +239,7 @@
   document.getElementById("tab-laporan").addEventListener("click", () => switchTab("laporan"));
   document.getElementById("tab-pendaftaran").addEventListener("click", () => switchTab("pendaftaran"));
   document.getElementById("tab-users").addEventListener("click", () => switchTab("users"));
+  document.getElementById("tab-iklan").addEventListener("click", () => switchTab("iklan"));
 
   // Export tabel Rekap Anggota (jam kerja + hadir/izin/cuti/alpa) jadi file PDF,
   // pakai jsPDF + autoTable yang di-load lewat CDN di <head>.
@@ -525,6 +559,126 @@
       btn.disabled = false; btn.textContent = "Ya, Reset";
     }
   });
+
+  // ====== Iklan (papan iklan foto + teks buat Dashboard) ======
+  let iklanFotoDataUrl = null;
+
+  // Kompres foto di browser dulu sebelum dikirim, sama kayak logika di
+  // Dashboard buat foto laporan absensi — biar nggak kena 413 Payload Too Large.
+  function compressIklanImage(file, maxDim = 1280, quality = 0.72) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Gagal memuat foto.")); };
+      img.src = objectUrl;
+    });
+  }
+  async function compressIklanUntilSmallEnough(file, maxBytes = 900 * 1024) {
+    let quality = 0.72;
+    let dataUrl = await compressIklanImage(file, 1280, quality);
+    while (dataUrl.length * 0.75 > maxBytes && quality > 0.35) {
+      quality -= 0.12;
+      dataUrl = await compressIklanImage(file, 1280, quality);
+    }
+    return dataUrl;
+  }
+
+  function renderIklanFotoPreview() {
+    const el = document.getElementById("iklan-foto-preview");
+    if (!iklanFotoDataUrl) { el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <div style="position:relative;display:inline-block">
+        <img src="${iklanFotoDataUrl}" style="max-width:160px;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        <button type="button" id="iklan-foto-remove" style="position:absolute;top:-6px;right:-6px;background:#b91c1c;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;">×</button>
+      </div>`;
+    document.getElementById("iklan-foto-remove").addEventListener("click", () => {
+      iklanFotoDataUrl = null;
+      renderIklanFotoPreview();
+    });
+  }
+
+  const iklanDropzone = document.getElementById("iklan-dropzone");
+  const iklanFotoInput = document.getElementById("iklan-foto");
+  iklanDropzone.addEventListener("click", () => iklanFotoInput.click());
+  async function handleIklanFile(file) {
+    const errorEl = document.getElementById("iklan-error");
+    errorEl.textContent = "";
+    if (!file || !file.type.startsWith("image/")) return;
+    try {
+      iklanFotoDataUrl = await compressIklanUntilSmallEnough(file);
+      renderIklanFotoPreview();
+    } catch (e) {
+      errorEl.textContent = `Gagal memproses foto: ${e.message}`;
+    }
+  }
+  iklanFotoInput.addEventListener("change", (e) => { handleIklanFile(e.target.files[0]); iklanFotoInput.value = ""; });
+  ["dragenter", "dragover"].forEach((evt) => iklanDropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    iklanDropzone.style.borderColor = "var(--red)";
+  }));
+  ["dragleave", "drop"].forEach((evt) => iklanDropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    iklanDropzone.style.borderColor = "var(--border)";
+  }));
+  iklanDropzone.addEventListener("drop", (e) => { handleIklanFile(e.dataTransfer.files[0]); });
+
+  document.getElementById("iklan-submit").addEventListener("click", async () => {
+    const errorEl = document.getElementById("iklan-error");
+    errorEl.textContent = "";
+    const teks = document.getElementById("iklan-teks").value.trim();
+    if (!teks && !iklanFotoDataUrl) { errorEl.textContent = "Isi teks atau foto iklan, minimal salah satu."; return; }
+
+    const btn = document.getElementById("iklan-submit");
+    btn.disabled = true; btn.textContent = "Menambahkan...";
+    try {
+      await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ tambahIklan: { teks, foto: iklanFotoDataUrl } }) });
+      document.getElementById("iklan-teks").value = "";
+      iklanFotoDataUrl = null;
+      renderIklanFotoPreview();
+      await refreshAll();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Tambah Iklan";
+    }
+  });
+
+  function refreshIklan() {
+    const listEl = document.getElementById("iklan-list");
+    if (!allIklan.length) { listEl.innerHTML = `<div class="sub">Belum ada iklan aktif.</div>`; return; }
+    listEl.innerHTML = allIklan.map((i) => `
+      <div style="display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:12px">
+        ${i.foto ? `<img src="${i.foto}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;flex-shrink:0">` : ""}
+        <div style="flex:1;min-width:0">
+          ${i.teks ? `<div style="font-size:13px;white-space:pre-wrap;margin-bottom:6px">${i.teks}</div>` : ""}
+          <div style="font-size:11px;color:var(--faint)">Dibuat oleh ${i.dibuatOleh} • ${formatTanggal(i.createdAt.slice(0, 10))}</div>
+        </div>
+        <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px;background:#7c2d12;color:#fed7aa;flex-shrink:0" onclick="hapusIklan('${i.id}')">Hapus</button>
+      </div>`).join("");
+  }
+
+  async function hapusIklan(id) {
+    if (!confirm("Hapus iklan ini?")) return;
+    try {
+      await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ hapusIklan: id }) });
+      await refreshAll();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
 </script>
 </body>
 </html>
