@@ -11,8 +11,7 @@ module.exports = async (req, res) => {
   const resetCount = absensi.length;
   await kvStore.setAbsensi([]);
   // Catatan: ini SENGAJA cuma hapus "nexotis:absensi" (buat reset periode
-  // gaji mingguan), TIDAK menyentuh data user sama sekali — jadi progress
-  // kenaikan pangkat (promoJam/promoLastHadir di user) tidak ikut ke-reset.
+  // gaji mingguan), TIDAK menyentuh data user sama sekali.
 
   // Tandai mulainya periode akumulasi baru (jam kerja/hadir/izin/cuti/alpa).
   // Ini SATU-SATUNYA tempat yang menggeser "periodeMulai" — jadi angka di
