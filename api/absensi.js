@@ -2,7 +2,6 @@ const crypto = require("crypto");
 const kvStore = require("../lib/kv");
 const { getUserFromReq } = require("../lib/auth");
 const { notifyLaporanMasuk } = require("../lib/discord");
-const { tambahJamPromosi } = require("../lib/promosi");
 
 // Upload 1 foto (data URL base64 dari browser) ke Cloudinary, balikin URL publiknya.
 // Cloudinary punya free tier yang gak minta kartu kredit sama sekali. Ini yang bikin
@@ -57,6 +56,18 @@ module.exports = async (req, res) => {
     if (!["hadir", "izin", "cuti"].includes(tipe)) return res.status(400).json({ error: "Tipe tidak valid." });
     if (tipe === "hadir" && (fotoList.length < 1 || fotoList.length > 3)) return res.status(400).json({ error: "Wajib 1–3 foto bukti untuk laporan hadir." });
 
+    // Anti-curang: cegah laporan HADIR ganda di tanggal yang sama. Kalau
+    // laporan sebelumnya di tanggal itu sudah "ditolak", boleh submit ulang
+    // (dianggap laporan baru pengganti) — yang diblokir cuma kalau masih ada
+    // laporan "pending" atau "diterima" di tanggal tersebut.
+    if (tipe === "hadir") {
+      const tanggalCek = tanggal || new Date().toISOString().slice(0, 10);
+      const sudahAda = absensiAll.some(
+        (a) => a.userId === user.id && a.tipe === "hadir" && a.tanggal === tanggalCek && a.status !== "ditolak"
+      );
+      if (sudahAda) return res.status(409).json({ error: "Kamu sudah punya laporan hadir untuk tanggal ini (masih pending/diterima)." });
+    }
+
     // Batas aman per foto (base64) supaya nggak numpuk jadi request raksasa yang
     // ditolak platform dengan 413 Payload Too Large sebelum sempat sampai ke sini.
     const MAX_FOTO_BYTES = 1.5 * 1024 * 1024; // ~1.5MB per foto setelah decode base64
@@ -97,17 +108,6 @@ module.exports = async (req, res) => {
     };
     absensiAll.push(record);
     await kvStore.setAbsensi(absensiAll);
-
-    // Progress kenaikan pangkat disimpan di user, bukan di record absensi —
-    // supaya nggak ikut hilang kalau High Command reset semua duty.
-    if (tipe === "hadir" && statusAwal === "diterima" && durasiJam > 0) {
-      const users = await kvStore.getUsers();
-      const u = users.find((x) => x.id === user.id);
-      if (u) {
-        tambahJamPromosi(u, record.tanggal, durasiJam);
-        await kvStore.setUsers(users);
-      }
-    }
 
     await notifyLaporanMasuk(user, record);
     return res.json({ ok: true, record });
