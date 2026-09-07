@@ -30,16 +30,10 @@
       <div class="pill alpa"><div class="num" id="pill-alpa">0</div><div class="lbl">Alpa</div></div>
     </div>
 
-    <div class="card promo-card" id="promo-card" style="display:none">
-      <h2>🎖️ Kenaikan Pangkat</h2>
-      <div class="promo-next" id="promo-next">Pangkat Selanjutnya: -</div>
-      <div class="promo-syarat" id="promo-syarat"><strong>Syarat:</strong> -</div>
-      <div class="promo-progress-bar"><div class="promo-progress-fill" id="promo-progress-fill"></div></div>
-      <div class="promo-progress-label" id="promo-progress-label"></div>
-    </div>
-    <div class="card" id="promo-maxed" style="display:none">
-      <h2>🎖️ Kenaikan Pangkat</h2>
-      <div class="sub">Kamu sudah berada di pangkat tertinggi. Mantap!</div>
+    <div class="card" id="leaderboard-card" style="display:none">
+      <h2>🏆 Leaderboard Jam Duty</h2>
+      <div class="sub">Top 5 anggota paling rajin duty periode ini.</div>
+      <div id="leaderboard-list"></div>
     </div>
 
     <div class="card">
@@ -122,6 +116,7 @@
     document.getElementById("rank-div").textContent = user.pangkat;
     document.getElementById("tanggal").value = toISO(new Date());
     await refreshAll();
+    await refreshLeaderboard(); // muncul tiap dashboard pertama kali dibuka / di-refresh
   })();
 
   async function refreshAll() {
@@ -142,25 +137,33 @@
     document.getElementById("pill-izin").textContent = s.izin;
     document.getElementById("pill-cuti").textContent = s.cuti;
     document.getElementById("pill-alpa").textContent = s.alpa;
-    refreshPromo();
   }
 
-  function refreshPromo() {
-    const promo = user.promosi;
-    if (!promo || promo.maxed) {
-      document.getElementById("promo-card").style.display = "none";
-      document.getElementById("promo-maxed").style.display = "block";
-      return;
+  const MEDALI = ["🥇", "🥈", "🥉"];
+  async function refreshLeaderboard() {
+    try {
+      const data = await api("/api/me?view=leaderboard");
+      const rows = data.leaderboard || [];
+      const card = document.getElementById("leaderboard-card");
+      const list = document.getElementById("leaderboard-list");
+      if (!rows.length) { card.style.display = "none"; return; }
+      card.style.display = "block";
+      list.innerHTML = rows.map((r, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;${i < rows.length - 1 ? "border-bottom:1px solid var(--border)" : ""}">
+          <div style="width:26px;text-align:center;font-size:15px;flex-shrink:0">${MEDALI[i] || (i + 1)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.namaKarakter || r.username}${r.id === user.id ? " (Kamu)" : ""}</div>
+            <div style="font-size:10px;color:var(--faint)">${r.pangkat}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:13px;font-weight:700;color:var(--blue)">${r.totalJam.toFixed(1)} Jam</div>
+            <div style="font-size:10px;color:var(--faint)">${r.hadir}x hadir</div>
+          </div>
+        </div>`).join("");
+    } catch (e) {
+      // Diam-diam gagal — leaderboard bukan fitur kritikal, jangan ganggu dashboard utama.
+      document.getElementById("leaderboard-card").style.display = "none";
     }
-    document.getElementById("promo-maxed").style.display = "none";
-    document.getElementById("promo-card").style.display = "block";
-    document.getElementById("promo-next").textContent = `Pangkat Selanjutnya: ${promo.pangkatBerikutnya}`;
-    document.getElementById("promo-syarat").innerHTML = `<strong>Syarat:</strong> ${promo.syarat}`;
-
-    const fill = document.getElementById("promo-progress-fill");
-    fill.style.width = promo.persen + "%";
-    fill.classList.toggle("selesai", promo.tercapai);
-    document.getElementById("promo-progress-label").textContent = promo.tercapai ? "✅ Syarat jam terpenuhi" : "";
   }
 
   function refreshRiwayat() {
