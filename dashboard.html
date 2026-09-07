@@ -30,6 +30,11 @@
       <div class="pill alpa"><div class="num" id="pill-alpa">0</div><div class="lbl">Alpa</div></div>
     </div>
 
+    <div class="card" id="iklan-card" style="display:none">
+      <h2>📢 Papan Iklan</h2>
+      <div id="iklan-list" style="display:flex;flex-direction:column;gap:12px"></div>
+    </div>
+
     <div class="card" id="leaderboard-card" style="display:none">
       <h2>🏆 Leaderboard Jam Duty</h2>
       <div class="sub">Top 5 anggota paling rajin duty periode ini.</div>
@@ -117,7 +122,27 @@
     document.getElementById("tanggal").value = toISO(new Date());
     await refreshAll();
     await refreshLeaderboard(); // muncul tiap dashboard pertama kali dibuka / di-refresh
+    await refreshIklan();
   })();
+
+  async function refreshIklan() {
+    try {
+      const data = await api("/api/me?view=iklan");
+      const rows = data.iklan || [];
+      const card = document.getElementById("iklan-card");
+      const list = document.getElementById("iklan-list");
+      if (!rows.length) { card.style.display = "none"; return; }
+      card.style.display = "block";
+      list.innerHTML = rows.map((i) => `
+        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          ${i.foto ? `<img src="${i.foto}" style="width:100%;max-height:220px;object-fit:cover;display:block">` : ""}
+          ${i.teks ? `<div style="padding:12px;font-size:13px;white-space:pre-wrap">${i.teks}</div>` : ""}
+        </div>`).join("");
+    } catch (e) {
+      // Diam-diam gagal — iklan bukan fitur kritikal, jangan ganggu dashboard utama.
+      document.getElementById("iklan-card").style.display = "none";
+    }
+  }
 
   async function refreshAll() {
     const data = await api("/api/absensi");
