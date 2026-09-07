@@ -40,11 +40,6 @@ function isPangkatHighCommand(pangkat) {
   const idx = PANGKAT_LIST.indexOf(pangkat);
   return idx !== -1 && idx <= HIGH_COMMAND_CUTOFF_INDEX;
 }
-// Catatan: syarat & jam kenaikan pangkat SENGAJA tidak ada di sini.
-// File ini (app.js) dikirim mentah ke browser semua anggota, jadi angka
-// syarat kenaikan pangkat disimpan di server (lib/promosi.js) dan diselipkan
-// ke response /api/me — biar anggota nggak bisa lihat threshold jamnya dari
-// DevTools/View Source.
 
 function formatTanggal(iso) {
   return new Date(iso + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
