@@ -3,7 +3,7 @@ const kvStore = require("../lib/kv");
 const { hashPassword, verifyPassword } = require("../lib/password");
 const { setSessionCookie, sanitizeUser } = require("../lib/auth");
 const { notifyPendaftaranBaru } = require("../lib/discord");
-const { PANGKAT_LIST } = require("../lib/promosi");
+const { PANGKAT_LIST } = require("../lib/pangkat");
 
 const SESSION_TTL_SEC = 12 * 60 * 60;
 
