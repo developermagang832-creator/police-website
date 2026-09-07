@@ -1,7 +1,7 @@
 const kvStore = require("../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../lib/auth");
 const { PANGKAT_LIST } = require("../lib/pangkat");
-const { TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, klaimGaji } = require("../lib/gaji");
+const { TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, bisaKlaimHariIni, klaimGaji } = require("../lib/gaji");
 const { notifyKlaimGaji } = require("../lib/discord");
 
 // Batas ukuran avatar (data URL base64). Avatar dikompres dulu di browser
@@ -71,6 +71,15 @@ module.exports = async (req, res) => {
     return res.json({ members });
   }
 
+  // ====== Aksi: papan iklan (buat dashboard) ======
+  // Numpang di GET /api/me?view=iklan — dibaca semua anggota yang login,
+  // sedangkan kelola (tambah/hapus) iklannya sendiri khusus High Command
+  // lewat /api/admin/rekap (lihat tab "Iklan" di Panel Rekap).
+  if (req.method === "GET" && req.query && req.query.view === "iklan") {
+    const iklan = await kvStore.getIklan();
+    return res.json({ iklan });
+  }
+
   // ====== Aksi: leaderboard jam duty (buat dashboard) ======
   // Numpang di GET /api/me?view=leaderboard — dipakai dashboard.html biar
   // langsung kelihatan tiap kali dibuka/di-refresh. Top 5 berdasarkan total
@@ -138,6 +147,11 @@ module.exports = async (req, res) => {
       if (!target) return res.status(404).json({ error: "User tidak ditemukan." });
 
       const jumlah = klaimGaji(target);
+      if (jumlah === "diluar-jadwal") {
+        return res.status(400).json({
+          error: "Pengambilan gaji cuma bisa hari Senin–Rabu. Kalau kelewat, jatah minggu ini hangus — coba lagi Senin depan.",
+        });
+      }
       if (jumlah === null) {
         return res.status(400).json({ error: "Gaji minggu ini sudah kamu klaim. Coba lagi minggu depan." });
       }
@@ -157,6 +171,7 @@ module.exports = async (req, res) => {
     tabel: TABEL_GAJI,
     gajiSaya: getGajiPangkat(user.pangkat),
     sudahKlaimMingguIni: sudahKlaimMingguIni(user),
+    bisaKlaimHariIni: bisaKlaimHariIni(),
     riwayat: user.riwayatGaji || [],
   };
 
