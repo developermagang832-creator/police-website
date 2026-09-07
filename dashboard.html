@@ -30,11 +30,6 @@
       <div class="pill alpa"><div class="num" id="pill-alpa">0</div><div class="lbl">Alpa</div></div>
     </div>
 
-    <div class="card" id="iklan-card" style="display:none">
-      <h2>📢 Papan Iklan</h2>
-      <div id="iklan-list" style="display:flex;flex-direction:column;gap:12px"></div>
-    </div>
-
     <div class="card" id="leaderboard-card" style="display:none">
       <h2>🏆 Leaderboard Jam Duty</h2>
       <div class="sub">Top 5 anggota paling rajin duty periode ini.</div>
@@ -101,6 +96,16 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="iklan-modal">
+    <div class="modal-box" style="max-width:420px;text-align:left">
+      <div id="iklan-modal-content"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <div id="iklan-modal-nav" style="font-size:12px;color:var(--faint)"></div>
+        <button class="btn btn-secondary" id="iklan-modal-close">Tutup</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="foto-modal">
     <div class="modal-box">
       <div id="modal-zoom-wrap" style="display:none;text-align:center"></div>
@@ -122,27 +127,51 @@
     document.getElementById("tanggal").value = toISO(new Date());
     await refreshAll();
     await refreshLeaderboard(); // muncul tiap dashboard pertama kali dibuka / di-refresh
-    await refreshIklan();
+    await refreshIklan(); // popup iklan — muncul sekali tiap load/refresh, bukan berulang
   })();
+
+  // ====== Popup Iklan (High Command kelola dari Panel Rekap → tab "Iklan") ======
+  // Ke-fetch & ke-tampilin SEKALI tiap dashboard pertama kali dibuka / di-refresh
+  // (bukan interval berulang) — jadi nggak nyepam, tapi tetap keliatan tiap
+  // anggota masuk/refresh halaman.
+  let iklanList = [];
+  let iklanIndex = 0;
 
   async function refreshIklan() {
     try {
       const data = await api("/api/me?view=iklan");
-      const rows = data.iklan || [];
-      const card = document.getElementById("iklan-card");
-      const list = document.getElementById("iklan-list");
-      if (!rows.length) { card.style.display = "none"; return; }
-      card.style.display = "block";
-      list.innerHTML = rows.map((i) => `
-        <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-          ${i.foto ? `<img src="${i.foto}" style="width:100%;max-height:220px;object-fit:cover;display:block">` : ""}
-          ${i.teks ? `<div style="padding:12px;font-size:13px;white-space:pre-wrap">${i.teks}</div>` : ""}
-        </div>`).join("");
+      iklanList = data.iklan || [];
+      if (!iklanList.length) return;
+      iklanIndex = 0;
+      renderIklanModal();
+      document.getElementById("iklan-modal").classList.add("open");
     } catch (e) {
       // Diam-diam gagal — iklan bukan fitur kritikal, jangan ganggu dashboard utama.
-      document.getElementById("iklan-card").style.display = "none";
     }
   }
+
+  function renderIklanModal() {
+    const iklan = iklanList[iklanIndex];
+    document.getElementById("iklan-modal-content").innerHTML = `
+      ${iklan.foto ? `<img src="${iklan.foto}" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-bottom:12px">` : ""}
+      ${iklan.teks ? `<div style="font-size:13px;white-space:pre-wrap">${iklan.teks}</div>` : ""}
+    `;
+    const navEl = document.getElementById("iklan-modal-nav");
+    if (iklanList.length > 1) {
+      navEl.innerHTML = `
+        <button class="btn-link" id="iklan-prev" ${iklanIndex === 0 ? "disabled" : ""}>‹ Sebelumnya</button>
+        <span style="margin:0 6px">${iklanIndex + 1}/${iklanList.length}</span>
+        <button class="btn-link" id="iklan-next" ${iklanIndex === iklanList.length - 1 ? "disabled" : ""}>Berikutnya ›</button>`;
+      document.getElementById("iklan-prev").addEventListener("click", () => { if (iklanIndex > 0) { iklanIndex--; renderIklanModal(); } });
+      document.getElementById("iklan-next").addEventListener("click", () => { if (iklanIndex < iklanList.length - 1) { iklanIndex++; renderIklanModal(); } });
+    } else {
+      navEl.innerHTML = "";
+    }
+  }
+
+  document.getElementById("iklan-modal-close").addEventListener("click", () => {
+    document.getElementById("iklan-modal").classList.remove("open");
+  });
 
   async function refreshAll() {
     const data = await api("/api/absensi");
