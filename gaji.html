@@ -57,7 +57,7 @@
     user = await requireAuth();
     if (!user) return;
     renderNavbar("gaji", user);
-    document.getElementById("greeting").textContent = `Gaji Mingguan — ${user.namaKarakter || user.username}`;
+    document.getElementById("greeting").textContent = `Gaji Mingguan ${user.namaKarakter || user.username}`;
     document.getElementById("rank-div").textContent = user.pangkat;
     await refresh();
   })();
