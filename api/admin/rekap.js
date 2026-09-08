@@ -26,7 +26,19 @@ module.exports = async (req, res) => {
   // Numpang di POST /api/admin/rekap — bukan endpoint baru — biar jumlah
   // serverless function nggak nambah (limit 12 di plan Hobby Vercel).
   if (req.method === "POST") {
-    const { tambahIklan, hapusIklan, kirimGajiManual } = req.body || {};
+    const { tambahIklan, hapusIklan, kirimGajiManual, resetGaji } = req.body || {};
+
+    // ====== Aksi: reset status klaim gaji SEMUA anggota ======
+    // Ngosongin `gajiKlaimMinggu` tiap anggota, jadi mereka bisa klaim gaji
+    // lagi biar pun minggu ini udah pernah klaim. TIDAK menyentuh riwayat
+    // gaji (riwayatGaji) ataupun data absensi — cuma status klaim minggu
+    // berjalan doang yang direset.
+    if (resetGaji) {
+      const users = await kvStore.getUsers();
+      users.forEach((u) => { u.gajiKlaimMinggu = null; });
+      await kvStore.setUsers(users);
+      return res.json({ ok: true, resetCount: users.length });
+    }
 
     // ====== Aksi: kirim Logs Gaji CUSTOM ke Discord (bonus/koreksi/dll) ======
     // Semua field diisi bebas oleh High Command — TIDAK mengubah data user
