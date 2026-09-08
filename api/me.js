@@ -1,7 +1,10 @@
 const kvStore = require("../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../lib/auth");
 const { PANGKAT_LIST } = require("../lib/pangkat");
-const { TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, bisaKlaimHariIni, klaimGaji } = require("../lib/gaji");
+const {
+  TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, bisaKlaimHariIni,
+  MIN_HADIR_UNTUK_KLAIM_GAJI, hitungHadirMingguIni, klaimGaji,
+} = require("../lib/gaji");
 const { notifyKlaimGaji } = require("../lib/discord");
 const { jakartaTodayISO } = require("../lib/waktu");
 
@@ -147,10 +150,19 @@ module.exports = async (req, res) => {
       const target = users.find((u) => u.id === user.id);
       if (!target) return res.status(404).json({ error: "User tidak ditemukan." });
 
-      const jumlah = klaimGaji(target);
+      const absensiAll = await kvStore.getAbsensi();
+      const absensiUser = absensiAll.filter((a) => a.userId === user.id);
+
+      const jumlah = klaimGaji(target, absensiUser);
       if (jumlah === "diluar-jadwal") {
         return res.status(400).json({
           error: "Pengambilan gaji cuma bisa hari Senin–Rabu. Kalau kelewat, jatah minggu ini hangus — coba lagi Senin depan.",
+        });
+      }
+      if (jumlah === "kurang-hadir") {
+        const sudah = hitungHadirMingguIni(absensiUser);
+        return res.status(400).json({
+          error: `Minimal hadir ${MIN_HADIR_UNTUK_KLAIM_GAJI} hari minggu ini buat bisa klaim gaji (baru ${sudah}/${MIN_HADIR_UNTUK_KLAIM_GAJI} hari).`,
         });
       }
       if (jumlah === null) {
@@ -167,12 +179,15 @@ module.exports = async (req, res) => {
   }
 
   // ====== GET profil + info gaji ======
+  const absensiAllUser = (await kvStore.getAbsensi()).filter((a) => a.userId === user.id);
   const sanitized = sanitizeUser(user);
   sanitized.gaji = {
     tabel: TABEL_GAJI,
     gajiSaya: getGajiPangkat(user.pangkat),
     sudahKlaimMingguIni: sudahKlaimMingguIni(user),
     bisaKlaimHariIni: bisaKlaimHariIni(),
+    minHadir: MIN_HADIR_UNTUK_KLAIM_GAJI,
+    hadirMingguIni: hitungHadirMingguIni(absensiAllUser),
     riwayat: user.riwayatGaji || [],
   };
 
