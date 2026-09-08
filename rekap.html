@@ -27,6 +27,7 @@
       <button class="btn btn-secondary" id="tab-pendaftaran">Pendaftaran</button>
       <button class="btn btn-secondary" id="tab-users">Kelola Anggota</button>
       <button class="btn btn-secondary" id="tab-iklan">Iklan</button>
+      <button class="btn btn-secondary" id="tab-gaji">Kirim Gaji</button>
     </div>
 
     <div class="card" id="panel-rekap">
@@ -137,6 +138,40 @@
         <div id="iklan-list" style="display:flex;flex-direction:column;gap:12px"></div>
       </div>
     </div>
+
+    <div id="panel-gaji" style="display:none">
+      <div class="card">
+        <h2>Kirim Logs Gaji (Custom)</h2>
+        <div class="sub" style="margin-bottom:10px">
+          Semua field bebas diisi sendiri — buat kasus di luar klaim mingguan biasa (bonus, koreksi, dll).
+          Ini CUMA ngirim log ke Discord, nggak mengubah data/saldo anggota mana pun.
+        </div>
+
+        <div class="form-group">
+          <label for="gm-nama">Nama</label>
+          <input type="text" id="gm-nama" placeholder="Nama petugas">
+        </div>
+
+        <div class="form-group">
+          <label for="gm-pangkat">Pangkat</label>
+          <input type="text" id="gm-pangkat" list="gm-pangkat-list" placeholder="Misal: PO III">
+          <datalist id="gm-pangkat-list"></datalist>
+        </div>
+
+        <div class="form-group">
+          <label for="gm-jumlah">Jumlah</label>
+          <input type="text" id="gm-jumlah" placeholder="Misal: $550.000 atau 550 (bonus)">
+        </div>
+
+        <div class="form-group">
+          <label for="gm-diberikan">Diberikan oleh</label>
+          <input type="text" id="gm-diberikan" placeholder="@username">
+        </div>
+
+        <div class="error-msg" id="gm-error"></div>
+        <button class="btn btn-primary" id="gm-submit">Kirim ke Discord</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal-overlay" id="foto-modal">
@@ -182,7 +217,7 @@
 
 <script src="app.js"></script>
 <script>
-  let allUsers = [], allAbsensi = [], allIklan = [], currentUserId = null, periodeMulai = null;
+  let allUsers = [], allAbsensi = [], allIklan = [], currentUserId = null, currentUsername = null, periodeMulai = null;
 
   function fillPangkatSelect(selectEl) {
     selectEl.innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -203,6 +238,8 @@
     if (!user) return;
     if (!user.isHighCommand) { window.location.href = "dashboard.html"; return; }
     currentUserId = user.id;
+    currentUsername = user.username;
+    document.getElementById("gm-diberikan").value = `@${user.username}`;
     renderNavbar("rekap", user);
     await refreshAll();
 
@@ -228,7 +265,7 @@
     refreshIklan();
   }
 
-  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", pendaftaran: "panel-pendaftaran", users: "panel-users", iklan: "panel-iklan" };
+  const tabs = { rekap: "panel-rekap", laporan: "panel-laporan", pendaftaran: "panel-pendaftaran", users: "panel-users", iklan: "panel-iklan", gaji: "panel-gaji" };
   function switchTab(active) {
     Object.entries(tabs).forEach(([key, panelId]) => {
       document.getElementById(panelId).style.display = key === active ? "block" : "none";
@@ -240,6 +277,7 @@
   document.getElementById("tab-pendaftaran").addEventListener("click", () => switchTab("pendaftaran"));
   document.getElementById("tab-users").addEventListener("click", () => switchTab("users"));
   document.getElementById("tab-iklan").addEventListener("click", () => switchTab("iklan"));
+  document.getElementById("tab-gaji").addEventListener("click", () => switchTab("gaji"));
 
   // Export tabel Rekap Anggota (jam kerja + hadir/izin/cuti/alpa) jadi file PDF,
   // pakai jsPDF + autoTable yang di-load lewat CDN di <head>.
@@ -679,6 +717,41 @@
       alert(e.message);
     }
   }
+
+  // ====== Kirim Gaji Manual (custom, semua field diisi bebas oleh HC) ======
+  document.getElementById("gm-pangkat-list").innerHTML = PANGKAT_LIST.map((p) => `<option value="${p}">`).join("");
+
+  document.getElementById("gm-submit").addEventListener("click", async () => {
+    const errorEl = document.getElementById("gm-error");
+    errorEl.textContent = "";
+
+    const namaPetugas = document.getElementById("gm-nama").value.trim();
+    const pangkat = document.getElementById("gm-pangkat").value.trim();
+    const jumlah = document.getElementById("gm-jumlah").value.trim();
+    const diberikanOleh = document.getElementById("gm-diberikan").value.trim() || `@${currentUsername}`;
+
+    if (!namaPetugas || !pangkat || !jumlah) {
+      errorEl.textContent = "Nama, Pangkat, dan Jumlah wajib diisi.";
+      return;
+    }
+
+    const btn = document.getElementById("gm-submit");
+    btn.disabled = true; btn.textContent = "Mengirim...";
+    try {
+      await api("/api/admin/rekap", {
+        method: "POST",
+        body: JSON.stringify({ kirimGajiManual: { namaPetugas, pangkat, jumlah, diberikanOleh } }),
+      });
+      document.getElementById("gm-nama").value = "";
+      document.getElementById("gm-pangkat").value = "";
+      document.getElementById("gm-jumlah").value = "";
+      document.getElementById("gm-diberikan").value = `@${currentUsername}`;
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Kirim ke Discord";
+    }
+  });
 </script>
 </body>
 </html>

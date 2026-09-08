@@ -44,7 +44,17 @@ function isPangkatHighCommand(pangkat) {
 function formatTanggal(iso) {
   return new Date(iso + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
-function toISO(d) { return d.toISOString().slice(0, 10); }
+// PENTING: pakai getter LOKAL (getFullYear/getMonth/getDate), BUKAN
+// toISOString() — soalnya toISOString() selalu convert ke UTC, dan device
+// anggota (WIB, UTC+7) bisa kegeser mundur 1 hari kalau lagi jam 00:00–06:59
+// WIB (masih "kemarin" di UTC). Semua Date di sini dibuat/dimanipulasi pakai
+// getter/setter lokal juga (getDay, setDate, dst), jadi ini konsisten.
+function toISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function getWeekDates() {
   const today = new Date();

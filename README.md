@@ -45,6 +45,21 @@ Struktur tetap serverless (cocok Vercel):
 
 6. Login, lalu mulai tambah anggota lain dari Panel Rekap
 
+## Fitur baru: Iklan & aturan Gaji
+
+- **Iklan** — High Command bisa tambah iklan (foto + teks) dari **Panel Rekap
+  → tab "Iklan"**. Iklan yang aktif otomatis muncul di Dashboard semua
+  anggota (di bagian "📢 Papan Iklan"). Foto iklan diupload ke Cloudinary
+  (env var `CLOUDINARY_CLOUD_NAME` & `CLOUDINARY_UPLOAD_PRESET` — sama yang
+  dipakai buat foto bukti absensi).
+- **Klaim Gaji Mingguan** — sekarang cuma bisa diambil **Senin–Rabu**. Kalau
+  lewat Rabu belum diklaim, jatah minggu itu **hangus** (nggak bisa diambil
+  susulan Kamis–Minggu), dan minggu berikutnya mulai dari 0 lagi.
+- **Webhook Logs Gaji dipisah** dari webhook utama (`DISCORD_WEBHOOK_URL`,
+  yang dipakai buat log absensi & pendaftaran) — isi env var
+  `DISCORD_WEBHOOK_GAJI_URL` di Vercel kalau mau notifikasi klaim gaji
+  (format "LOGS GAJI") masuk ke channel Discord yang beda.
+
 ## Catatan penting
 
 - **Belum di-deploy/test di sandbox pembuatan ini** (tidak ada akses jaringan)
