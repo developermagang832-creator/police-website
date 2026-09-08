@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { jakartaTodayISO } = require("../lib/waktu");
 const kvStore = require("../lib/kv");
 const { hashPassword, verifyPassword } = require("../lib/password");
 const { setSessionCookie, sanitizeUser } = require("../lib/auth");
@@ -38,7 +39,7 @@ module.exports = async (req, res) => {
       isHighCommand: false,
       avatar: null,
       status: "pending", // wajib di-approve HC dulu sebelum bisa login
-      bergabung: new Date().toISOString().slice(0, 10),
+      bergabung: jakartaTodayISO(),
     };
 
     try {

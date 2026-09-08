@@ -3,6 +3,7 @@ const { getUserFromReq, sanitizeUser } = require("../lib/auth");
 const { PANGKAT_LIST } = require("../lib/pangkat");
 const { TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, bisaKlaimHariIni, klaimGaji } = require("../lib/gaji");
 const { notifyKlaimGaji } = require("../lib/discord");
+const { jakartaTodayISO } = require("../lib/waktu");
 
 // Batas ukuran avatar (data URL base64). Avatar dikompres dulu di browser
 // (compressAvatarFile di app.js) sebelum dikirim, jadi normalnya jauh di
@@ -19,7 +20,7 @@ function effectiveMulai(periodeMulai, bergabung) {
 // Total jam duty (laporan "hadir" berstatus "diterima") + jumlah hari hadir
 // sejak `mulaiIso` sampai hari ini — dipakai buat Leaderboard dashboard.
 function calcTotalJamHadir(records, mulaiIso) {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = jakartaTodayISO(); // WIB, bukan UTC server — biar konsisten sama kalender anggota
   const mulai = mulaiIso || todayStr;
   let totalMinutes = 0;
   const hadirDays = new Set();

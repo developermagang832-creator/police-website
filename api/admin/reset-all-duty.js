@@ -1,5 +1,6 @@
 const kvStore = require("../../lib/kv");
 const { getUserFromReq } = require("../../lib/auth");
+const { jakartaTodayISO } = require("../../lib/waktu");
 
 module.exports = async (req, res) => {
   const user = await getUserFromReq(req);
@@ -17,7 +18,7 @@ module.exports = async (req, res) => {
   // Ini SATU-SATUNYA tempat yang menggeser "periodeMulai" — jadi angka di
   // dashboard & Panel Rekap TIDAK bakal auto-reset sendiri tiap ganti minggu
   // kalender, cuma berubah kalau High Command klik tombol ini.
-  const periodeBaru = new Date().toISOString().slice(0, 10);
+  const periodeBaru = jakartaTodayISO();
   await kvStore.setPeriodeMulai(periodeBaru);
 
   res.json({ ok: true, resetCount, periodeMulai: periodeBaru });

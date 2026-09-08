@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { jakartaTodayISO } = require("../../lib/waktu");
 const kvStore = require("../../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../../lib/auth");
 const { hashPassword } = require("../../lib/password");
@@ -30,7 +31,7 @@ module.exports = async (req, res) => {
       isHighCommand: !!isHighCommand,
       avatar: null,
       status: "approved", // dibuat langsung sama HC, jadi otomatis approved (nggak lewat alur pendaftaran)
-      bergabung: new Date().toISOString().slice(0, 10), // dipakai biar hari sebelum gabung nggak ikut dihitung alpa
+      bergabung: jakartaTodayISO(), // dipakai biar hari sebelum gabung nggak ikut dihitung alpa
     };
     users.push(newUser);
     await kvStore.setUsers(users);

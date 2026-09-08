@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const kvStore = require("../../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../../lib/auth");
 const { uploadFotoKeCloudinary } = require("../../lib/cloudinary");
+const { kirimLogsGajiManual } = require("../../lib/discord");
 
 // Batas ukuran foto iklan (data URL base64) — sama kayak batas foto laporan
 // absensi, biar konsisten dan nggak numpuk jadi request raksasa.
@@ -25,7 +26,24 @@ module.exports = async (req, res) => {
   // Numpang di POST /api/admin/rekap — bukan endpoint baru — biar jumlah
   // serverless function nggak nambah (limit 12 di plan Hobby Vercel).
   if (req.method === "POST") {
-    const { tambahIklan, hapusIklan } = req.body || {};
+    const { tambahIklan, hapusIklan, kirimGajiManual } = req.body || {};
+
+    // ====== Aksi: kirim Logs Gaji CUSTOM ke Discord (bonus/koreksi/dll) ======
+    // Semua field diisi bebas oleh High Command — TIDAK mengubah data user
+    // apa pun, cuma nembak log ke Discord (webhook DISCORD_WEBHOOK_GAJI_URL).
+    if (kirimGajiManual) {
+      const namaPetugas = String(kirimGajiManual.namaPetugas || "").trim().slice(0, 100);
+      const pangkat = String(kirimGajiManual.pangkat || "").trim().slice(0, 100);
+      const jumlah = String(kirimGajiManual.jumlah || "").trim().slice(0, 200);
+      const diberikanOleh = String(kirimGajiManual.diberikanOleh || `@${user.username}`).trim().slice(0, 100);
+
+      if (!namaPetugas || !pangkat || !jumlah) {
+        return res.status(400).json({ error: "Nama, Pangkat, dan Jumlah wajib diisi." });
+      }
+
+      await kirimLogsGajiManual({ namaPetugas, pangkat, jumlah, diberikanOleh });
+      return res.json({ ok: true });
+    }
 
     if (tambahIklan) {
       const teks = String(tambahIklan.teks || "").trim();

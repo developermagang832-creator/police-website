@@ -3,6 +3,7 @@ const kvStore = require("../lib/kv");
 const { getUserFromReq } = require("../lib/auth");
 const { notifyLaporanMasuk } = require("../lib/discord");
 const { uploadFotoKeCloudinary } = require("../lib/cloudinary");
+const { jakartaTodayISO } = require("../lib/waktu");
 
 // Durasi duty dalam jam dari "HH:MM" ke "HH:MM" (menangani lewat tengah malam).
 function calcDurasiJam(mulai, selesai) {
@@ -36,7 +37,7 @@ module.exports = async (req, res) => {
     // (dianggap laporan baru pengganti) — yang diblokir cuma kalau masih ada
     // laporan "pending" atau "diterima" di tanggal tersebut.
     if (tipe === "hadir") {
-      const tanggalCek = tanggal || new Date().toISOString().slice(0, 10);
+      const tanggalCek = tanggal || jakartaTodayISO();
       const sudahAda = absensiAll.some(
         (a) => a.userId === user.id && a.tipe === "hadir" && a.tanggal === tanggalCek && a.status !== "ditolak"
       );
@@ -69,7 +70,7 @@ module.exports = async (req, res) => {
     const record = {
       id: absensiId,
       userId: user.id,
-      tanggal: tanggal || new Date().toISOString().slice(0, 10),
+      tanggal: tanggal || jakartaTodayISO(),
       tipe,
       waktuMulai: tipe === "hadir" ? waktuMulai : null,
       waktuSelesai: tipe === "hadir" ? waktuSelesai : null,
