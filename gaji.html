@@ -25,10 +25,12 @@
     <div class="card">
       <h2>💰 Klaim Gaji Minggu Ini</h2>
       <div class="sub">
-        Pengambilan gaji cuma bisa hari <strong>Senin–Rabu</strong>. Kalau kelewat,
-        jatah minggu ini <strong>hangus</strong> (nggak bisa diambil susulan
-        Kamis–Minggu) dan minggu depan mulai dari nol lagi.
+        Pengambilan gaji cuma bisa hari <strong>Senin–Rabu</strong>, dan minimal
+        udah hadir <strong id="min-hadir-label">2</strong> hari minggu ini. Kalau
+        lewat Rabu, jatah minggu ini <strong>hangus</strong> (nggak bisa diambil
+        susulan Kamis–Minggu) dan minggu depan mulai dari nol lagi.
       </div>
+      <div id="hadir-progress" style="font-size:12px;color:var(--faint);margin-bottom:10px"></div>
       <div id="klaim-status" style="font-size:13px;margin-bottom:14px"></div>
       <div class="error-msg" id="klaim-error"></div>
       <button class="btn btn-primary" id="klaim-btn">Klaim Gaji Sekarang</button>
@@ -66,6 +68,9 @@
     gajiInfo = user.gaji;
 
     document.getElementById("stat-gaji").textContent = `$${Number(gajiInfo.gajiSaya).toLocaleString("id-ID")}`;
+    document.getElementById("min-hadir-label").textContent = gajiInfo.minHadir;
+    document.getElementById("hadir-progress").textContent =
+      `Hadir minggu ini: ${gajiInfo.hadirMingguIni}/${gajiInfo.minHadir} hari`;
     renderStatus();
     renderRiwayat();
   }
@@ -83,6 +88,10 @@
       statusEl.innerHTML = `<span class="badge ditolak">⛔ Di luar jadwal (Senin–Rabu)</span> <span style="color:var(--faint)">— jatah minggu ini hangus, coba lagi Senin depan.</span>`;
       btn.disabled = true;
       btn.textContent = "Di Luar Jadwal Pengambilan";
+    } else if (gajiInfo.hadirMingguIni < gajiInfo.minHadir) {
+      statusEl.innerHTML = `<span class="badge ditolak">⛔ Hadir belum cukup (${gajiInfo.hadirMingguIni}/${gajiInfo.minHadir} hari)</span>`;
+      btn.disabled = true;
+      btn.textContent = "Hadir Belum Cukup";
     } else {
       statusEl.innerHTML = `<span class="badge rank">🟢 Bisa diklaim sekarang</span>`;
       btn.disabled = false;
