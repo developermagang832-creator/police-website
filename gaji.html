@@ -17,18 +17,17 @@
 
     <div class="stats-grid">
       <div class="stat-card money">
-        <div class="label">Gaji per Minggu (sesuai pangkat)</div>
+        <div class="label">Gaji per Minggu</div>
         <div class="value" id="stat-gaji">$0</div>
       </div>
     </div>
 
     <div class="card">
-      <h2>💰 Klaim Gaji Minggu Ini</h2>
+      <h2>Claim Gajihh</h2>
       <div class="sub">
         Pengambilan gaji cuma bisa hari <strong>Senin–Rabu</strong>, dan minimal
         udah hadir <strong id="min-hadir-label">2</strong> hari minggu ini. Kalau
-        lewat Rabu, jatah minggu ini <strong>hangus</strong> (nggak bisa diambil
-        susulan Kamis–Minggu) dan minggu depan mulai dari nol lagi.
+        lewat Rabu, jatah minggu ini <strong>hangus</strong> (engak bisa diambil ) dan minggu depan mulai dari nol lagi.
       </div>
       <div id="hadir-progress" style="font-size:12px;color:var(--faint);margin-bottom:10px"></div>
       <div id="klaim-status" style="font-size:13px;margin-bottom:14px"></div>
@@ -37,7 +36,7 @@
     </div>
 
     <div class="card">
-      <h2>📜 Riwayat Klaim</h2>
+      <h2>History Gajih</h2>
       <div style="overflow-x:auto">
         <table>
           <thead>
@@ -83,7 +82,7 @@
     if (gajiInfo.sudahKlaimMingguIni) {
       statusEl.innerHTML = `<span class="badge diterima">✅ Sudah diklaim minggu ini</span>`;
       btn.disabled = true;
-      btn.textContent = "Sudah Diklaim Minggu Ini";
+      btn.textContent = "UDah Di ambil";
     } else if (!gajiInfo.bisaKlaimHariIni) {
       statusEl.innerHTML = `<span class="badge ditolak">⛔ Di luar jadwal (Senin–Rabu)</span> <span style="color:var(--faint)">— jatah minggu ini hangus, coba lagi Senin depan.</span>`;
       btn.disabled = true;
