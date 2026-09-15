@@ -10,7 +10,7 @@ const {
   ARREST_TARGET_MINGGUAN, JAM_TARGET_MINGGUAN, getNextPangkat,
   getMondayISO, hitungProgresMingguIni, cekEligible,
 } = require("../lib/promosi");
-const { hitungRankDuty } = require("../lib/rankduty");
+const { hitungRankDuty, JAM_RANK_PERTAMA, TAMBAHAN_JAM_PER_RANK } = require("../lib/rankduty");
 const { notifyKlaimGaji, notifyPengajuanPromosi } = require("../lib/discord");
 const { jakartaTodayISO } = require("../lib/waktu");
 
@@ -104,6 +104,7 @@ module.exports = async (req, res) => {
         const records = absensi.filter((a) => a.userId === u.id);
         const mulai = effectiveMulai(periodeMulai, u.bergabung);
         const { totalJam, hadir } = calcTotalJamHadir(records, mulai);
+        const rd = hitungRankDuty(records);
         return {
           id: u.id,
           username: u.username,
@@ -112,12 +113,21 @@ module.exports = async (req, res) => {
           avatar: u.avatar || null,
           totalJam: Math.round(totalJam * 10) / 10,
           hadir,
+          // Rank duty bulan berjalan: rank 1 = 30 jam dalam satu minggu,
+          // tiap naik rank targetnya +10 jam. Reset otomatis tiap ganti bulan.
+          rank: rd.rank,
+          rankTargetBerikut: rd.targetJam,
+          jamMingguIni: rd.jamMingguIni,
         };
       })
       .filter((r) => r.totalJam > 0)
-      .sort((a, b) => b.totalJam - a.totalJam || b.hadir - a.hadir)
+      .sort((a, b) => b.rank - a.rank || b.totalJam - a.totalJam || b.hadir - a.hadir)
       .slice(0, 5);
-    return res.json({ leaderboard: board, periodeMulai });
+    return res.json({
+      leaderboard: board,
+      periodeMulai,
+      rankInfo: { jamRankPertama: JAM_RANK_PERTAMA, tambahanPerRank: TAMBAHAN_JAM_PER_RANK },
+    });
   }
 
   if (req.method === "POST") {
@@ -262,10 +272,6 @@ module.exports = async (req, res) => {
     eligible: cekEligible(progresPromosi),
     pengajuanMingguIni,
   };
-
-  // Rank duty berjenjang (30 jam untuk rank 1, +10 jam tiap naik rank,
-  // dihitung per minggu dan reset otomatis tiap ganti bulan WIB).
-  sanitized.rankDuty = hitungRankDuty(absensiAllUser);
 
   res.json({ user: sanitized });
 };
