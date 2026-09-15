@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const kvStore = require("../../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../../lib/auth");
 const { uploadFotoKeCloudinary } = require("../../lib/cloudinary");
-const { kirimLogsGajiManual } = require("../../lib/discord");
+const { kirimLogsGajiManual, notifyPromosiDiproses } = require("../../lib/discord");
 
 // Batas ukuran foto iklan (data URL base64) — sama kayak batas foto laporan
 // absensi, biar konsisten dan nggak numpuk jadi request raksasa.
@@ -19,14 +19,49 @@ module.exports = async (req, res) => {
     const absensi = await kvStore.getAbsensi();
     const periodeMulai = await kvStore.getPeriodeMulai();
     const iklan = await kvStore.getIklan();
-    return res.json({ users: users.map(sanitizeUser), absensi, periodeMulai, iklan });
+    const promosi = await kvStore.getPromosi();
+    return res.json({ users: users.map(sanitizeUser), absensi, periodeMulai, iklan, promosi });
   }
 
   // ====== Aksi: kelola Iklan (papan iklan foto + teks di Panel Rekap) ======
   // Numpang di POST /api/admin/rekap — bukan endpoint baru — biar jumlah
   // serverless function nggak nambah (limit 12 di plan Hobby Vercel).
   if (req.method === "POST") {
-    const { tambahIklan, hapusIklan, kirimGajiManual, resetGaji } = req.body || {};
+    const { tambahIklan, hapusIklan, kirimGajiManual, resetGaji, prosesPromosi } = req.body || {};
+
+    // ====== Aksi: ACC / tolak pengajuan Kenaikan Pangkat ======
+    // Kalau "diterima": pangkat anggota BENERAN dinaikkan ke pangkatTarget
+    // yang tercatat di pengajuan. Kalau "ditolak": anggota boleh ajukan lagi
+    // asal target minggu itu masih terpenuhi (lihat api/me.js).
+    if (prosesPromosi) {
+      const { id, status, alasan } = prosesPromosi;
+      if (!id || !["diterima", "ditolak"].includes(status)) {
+        return res.status(400).json({ error: "Status tidak valid." });
+      }
+
+      const promosiAll = await kvStore.getPromosi();
+      const permintaan = promosiAll.find((p) => p.id === id);
+      if (!permintaan) return res.status(404).json({ error: "Pengajuan tidak ditemukan." });
+      if (permintaan.status !== "pending") {
+        return res.status(400).json({ error: "Pengajuan ini sudah diproses sebelumnya." });
+      }
+
+      permintaan.status = status;
+      permintaan.diprosesOleh = user.username;
+      permintaan.diprosesPada = new Date().toISOString();
+      if (status === "ditolak") permintaan.alasan = alasan || null;
+
+      const users = await kvStore.getUsers();
+      const anggota = users.find((u) => u.id === permintaan.userId);
+      if (status === "diterima" && anggota) {
+        anggota.pangkat = permintaan.pangkatTarget;
+        await kvStore.setUsers(users);
+      }
+      await kvStore.setPromosi(promosiAll);
+
+      if (anggota) await notifyPromosiDiproses(anggota, user, permintaan);
+      return res.json({ ok: true });
+    }
 
     // ====== Aksi: reset status klaim gaji SEMUA anggota ======
     // Ngosongin `gajiKlaimMinggu` tiap anggota, jadi mereka bisa klaim gaji

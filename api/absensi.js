@@ -5,16 +5,6 @@ const { notifyLaporanMasuk } = require("../lib/discord");
 const { uploadFotoKeCloudinary } = require("../lib/cloudinary");
 const { jakartaTodayISO } = require("../lib/waktu");
 
-// Durasi duty dalam jam dari "HH:MM" ke "HH:MM" (menangani lewat tengah malam).
-function calcDurasiJam(mulai, selesai) {
-  if (!mulai || !selesai) return 0;
-  const [h1, m1] = mulai.split(":").map(Number);
-  const [h2, m2] = selesai.split(":").map(Number);
-  let mins = (h2 * 60 + m2) - (h1 * 60 + m1);
-  if (mins < 0) mins += 24 * 60;
-  return mins / 60;
-}
-
 module.exports = async (req, res) => {
   const user = await getUserFromReq(req);
   if (!user) return res.status(401).json({ error: "Belum login." });
@@ -51,8 +41,11 @@ module.exports = async (req, res) => {
     if (tooBig) return res.status(413).json({ error: "Salah satu foto masih terlalu besar. Coba upload ulang foto tersebut." });
     if (tipe === "cuti" && (!cutiMulai || !cutiSelesai)) return res.status(400).json({ error: "Periode cuti wajib diisi." });
 
-    const durasiJam = tipe === "hadir" ? calcDurasiJam(waktuMulai, waktuSelesai) : 0;
-    const statusAwal = tipe === "hadir" && durasiJam < 6 ? "diterima" : "pending";
+    // SEMUA laporan (hadir/izin/cuti) WAJIB di-ACC dulu sama High Command
+    // sebelum berstatus "diterima" — nggak ada lagi auto-diterima, soalnya
+    // jam duty yang "diterima" ini yang jadi patokan Target Kenaikan Pangkat
+    // (lihat lib/promosi.js), jadi harus lewat verifikasi manual dulu.
+    const statusAwal = "pending";
     const absensiId = crypto.randomBytes(8).toString("hex");
 
     // Upload tiap foto ke Vercel Blob dulu, baru simpan URL-nya (bukan base64-nya)

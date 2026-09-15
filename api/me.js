@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const kvStore = require("../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../lib/auth");
 const { PANGKAT_LIST } = require("../lib/pangkat");
@@ -5,7 +6,11 @@ const {
   TABEL_GAJI, getGajiPangkat, sudahKlaimMingguIni, bisaKlaimHariIni,
   MIN_HADIR_UNTUK_KLAIM_GAJI, hitungHadirMingguIni, klaimGaji,
 } = require("../lib/gaji");
-const { notifyKlaimGaji } = require("../lib/discord");
+const {
+  ARREST_TARGET_MINGGUAN, JAM_TARGET_MINGGUAN, getNextPangkat,
+  getMondayISO, hitungProgresMingguIni, cekEligible,
+} = require("../lib/promosi");
+const { notifyKlaimGaji, notifyPengajuanPromosi } = require("../lib/discord");
 const { jakartaTodayISO } = require("../lib/waktu");
 
 // Batas ukuran avatar (data URL base64). Avatar dikompres dulu di browser
@@ -115,7 +120,55 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === "POST") {
-    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar } = req.body || {};
+    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar, ajukanPromosi } = req.body || {};
+
+    // ====== Aksi: ajukan Kenaikan Pangkat ======
+    // Cuma bisa diajukan kalau target minggu ini (5x arrest + 30 jam duty
+    // yang SUDAH diterima HC) sudah terpenuhi. Pengajuan ini masuk status
+    // "pending" — pangkat BELUM naik sampai di-ACC High Command lewat Panel
+    // Rekap -> tab "Kenaikan Pangkat".
+    if (ajukanPromosi) {
+      const users = await kvStore.getUsers();
+      const target = users.find((u) => u.id === user.id);
+      if (!target) return res.status(404).json({ error: "Akun tidak ditemukan." });
+
+      const pangkatTarget = getNextPangkat(target.pangkat);
+      if (!pangkatTarget) return res.status(400).json({ error: "Kamu sudah berada di pangkat tertinggi." });
+
+      const absensiUser = (await kvStore.getAbsensi()).filter((a) => a.userId === target.id);
+      const arrestsUser = (await kvStore.getArrests()).filter((a) => a.dibuatOlehUserId === target.id);
+      const progres = hitungProgresMingguIni(absensiUser, arrestsUser);
+
+      if (!cekEligible(progres)) {
+        return res.status(400).json({
+          error: `Belum memenuhi target minggu ini: ${progres.jumlahArrest}/${ARREST_TARGET_MINGGUAN} arrest record, ${progres.jamDuty.toFixed(1)}/${JAM_TARGET_MINGGUAN} jam duty (yang sudah diterima HC).`,
+        });
+      }
+
+      const promosiAll = await kvStore.getPromosi();
+      const mingguIni = getMondayISO();
+      const sudahAda = promosiAll.some((p) => p.userId === target.id && p.minggu === mingguIni && p.status !== "ditolak");
+      if (sudahAda) return res.status(409).json({ error: "Kamu sudah punya pengajuan kenaikan pangkat untuk minggu ini." });
+
+      const request = {
+        id: crypto.randomBytes(8).toString("hex"),
+        userId: target.id,
+        pangkatSaat: target.pangkat,
+        pangkatTarget,
+        arrestCount: progres.jumlahArrest,
+        jamDuty: Math.round(progres.jamDuty * 10) / 10,
+        minggu: mingguIni,
+        status: "pending",
+        alasan: null,
+        diprosesOleh: null,
+        tanggal: new Date().toISOString(),
+      };
+      promosiAll.push(request);
+      await kvStore.setPromosi(promosiAll);
+      await notifyPengajuanPromosi(target, request);
+
+      return res.json({ ok: true, request });
+    }
 
     // ====== Aksi: update profil sendiri (nama karakter & foto profil) ======
     if (updateProfile) {
@@ -178,7 +231,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Aksi tidak dikenal." });
   }
 
-  // ====== GET profil + info gaji ======
+  // ====== GET profil + info gaji + progress kenaikan pangkat ======
   const absensiAllUser = (await kvStore.getAbsensi()).filter((a) => a.userId === user.id);
   const sanitized = sanitizeUser(user);
   sanitized.gaji = {
@@ -189,6 +242,24 @@ module.exports = async (req, res) => {
     minHadir: MIN_HADIR_UNTUK_KLAIM_GAJI,
     hadirMingguIni: hitungHadirMingguIni(absensiAllUser),
     riwayat: user.riwayatGaji || [],
+  };
+
+  const arrestsAllUser = (await kvStore.getArrests()).filter((a) => a.dibuatOlehUserId === user.id);
+  const progresPromosi = hitungProgresMingguIni(absensiAllUser, arrestsAllUser);
+  const promosiAll = await kvStore.getPromosi();
+  const mingguIni = getMondayISO();
+  const pengajuanMingguIni = promosiAll
+    .filter((p) => p.userId === user.id && p.minggu === mingguIni)
+    .sort((a, b) => b.tanggal.localeCompare(a.tanggal))[0] || null;
+
+  sanitized.promosi = {
+    targetArrest: ARREST_TARGET_MINGGUAN,
+    targetJam: JAM_TARGET_MINGGUAN,
+    arrestMingguIni: progresPromosi.jumlahArrest,
+    jamMingguIni: Math.round(progresPromosi.jamDuty * 10) / 10,
+    pangkatTarget: getNextPangkat(user.pangkat),
+    eligible: cekEligible(progresPromosi),
+    pengajuanMingguIni,
   };
 
   res.json({ user: sanitized });
