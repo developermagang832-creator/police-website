@@ -10,6 +10,7 @@ const {
   ARREST_TARGET_MINGGUAN, JAM_TARGET_MINGGUAN, getNextPangkat,
   getMondayISO, hitungProgresMingguIni, cekEligible,
 } = require("../lib/promosi");
+const { hitungRankDuty } = require("../lib/rankduty");
 const { notifyKlaimGaji, notifyPengajuanPromosi } = require("../lib/discord");
 const { jakartaTodayISO } = require("../lib/waktu");
 
@@ -261,6 +262,10 @@ module.exports = async (req, res) => {
     eligible: cekEligible(progresPromosi),
     pengajuanMingguIni,
   };
+
+  // Rank duty berjenjang (30 jam untuk rank 1, +10 jam tiap naik rank,
+  // dihitung per minggu dan reset otomatis tiap ganti bulan WIB).
+  sanitized.rankDuty = hitungRankDuty(absensiAllUser);
 
   res.json({ user: sanitized });
 };

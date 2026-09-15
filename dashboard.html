@@ -36,6 +36,41 @@
       <div id="leaderboard-list"></div>
     </div>
 
+    <div class="card" id="rankduty-card" style="display:none">
+      <h2>🎖️ Rank Duty Bulanan</h2>
+      <div class="sub" id="rankduty-sub">Memuat...</div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin:10px 0 14px">
+        <div id="rankduty-badge" style="min-width:54px;height:54px;border-radius:12px;background:var(--blue);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+          <div style="font-size:9px;letter-spacing:1px;opacity:.85">RANK</div>
+          <div style="font-size:20px;font-weight:800;line-height:1" id="rankduty-angka">0</div>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:700" id="rankduty-judul">Belum ada rank bulan ini</div>
+          <div style="font-size:11px;color:var(--faint)" id="rankduty-ket"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span>Jam duty diterima minggu ini</span>
+          <span id="rankduty-jam-label">0/30 jam</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="rankduty-jam-bar" style="width:0%"></div></div>
+      </div>
+
+      <div id="rankduty-status" style="font-size:12px;margin-bottom:10px"></div>
+
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Minggu</th><th>Periode</th><th>Jam</th><th>Target</th><th>Status</th></tr>
+          </thead>
+          <tbody id="rankduty-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card" id="promosi-card">
       <h2>⭐ Target Kenaikan Pangkat</h2>
       <div class="sub" id="promosi-sub">Memuat...</div>
@@ -302,9 +337,61 @@
       const data = await api("/api/me");
       promosiInfo = data.user.promosi;
       renderPromosi();
+      renderRankDuty(data.user.rankDuty);
     } catch (e) {
       // Diam-diam gagal — jangan ganggu dashboard utama.
     }
+  }
+
+  // ====== Rank Duty Bulanan (30 jam rank 1, +10 jam tiap naik, reset tiap bulan) ======
+  function renderRankDuty(rd) {
+    const card = document.getElementById("rankduty-card");
+    if (!rd) { card.style.display = "none"; return; }
+    card.style.display = "block";
+
+    document.getElementById("rankduty-sub").textContent =
+      `Periode ${rd.labelBulan}. Rank 1 butuh ${rd.jamRankPertama} jam dalam satu minggu (Senin–Minggu WIB), lalu targetnya naik ${rd.tambahanPerRank} jam tiap kamu naik 1 rank. Rank reset otomatis tiap ganti bulan.`;
+
+    document.getElementById("rankduty-angka").textContent = rd.rank;
+    document.getElementById("rankduty-judul").textContent =
+      rd.rank > 0 ? `Rank ${rd.rank} bulan ini` : "Belum ada rank bulan ini";
+    document.getElementById("rankduty-ket").textContent =
+      `Target rank ${rd.rank + 1}: ${rd.targetJam} jam dalam satu minggu.`;
+
+    const pct = Math.min(100, Math.round((rd.jamMingguIni / rd.targetJam) * 100));
+    document.getElementById("rankduty-jam-label").textContent = `${rd.jamMingguIni}/${rd.targetJam} jam`;
+    const bar = document.getElementById("rankduty-jam-bar");
+    bar.style.width = pct + "%";
+    bar.style.background = pct >= 100 ? "var(--green)" : "var(--blue)";
+
+    const statusEl = document.getElementById("rankduty-status");
+    if (!rd.mingguIni) {
+      statusEl.innerHTML = `<span style="color:var(--faint)">Minggu berjalan belum terdeteksi di periode ini.</span>`;
+    } else if (rd.mingguIniTercapai) {
+      statusEl.innerHTML = `<span style="color:var(--green)">✅ Target minggu ini sudah tercapai — rank kamu naik. Kejar ${rd.targetJam} jam minggu depan buat naik lagi.</span>`;
+    } else {
+      statusEl.innerHTML = `<span style="color:var(--faint)">Kurang <b>${rd.sisaJam} jam</b> lagi minggu ini. Kalau nggak kekejar sampai Minggu, minggu ini cuma dianggap gagal — rank yang sudah didapat tetap aman dan targetnya nggak naik.</span>`;
+    }
+
+    const LABEL = {
+      "tercapai": `<span style="color:var(--green)">✅ Tercapai</span>`,
+      "gagal": `<span style="color:var(--red,#e05260)">❌ Gagal</span>`,
+      "berjalan": `<span style="color:var(--blue)">⏳ Berjalan</span>`,
+      "belum-mulai": `<span style="color:var(--faint)">— Belum mulai</span>`,
+    };
+    document.getElementById("rankduty-body").innerHTML = (rd.riwayat || []).map((w) => `
+      <tr>
+        <td>Minggu ${w.ke}</td>
+        <td style="white-space:nowrap">${fmtTgl(w.mulai)} – ${fmtTgl(w.selesai)}</td>
+        <td>${w.jam} jam</td>
+        <td>${w.target} jam</td>
+        <td>${LABEL[w.status] || w.status}</td>
+      </tr>`).join("");
+  }
+
+  function fmtTgl(iso) {
+    const [, b, t] = iso.split("-");
+    return `${t}/${b}`;
   }
 
   function renderPromosi() {
