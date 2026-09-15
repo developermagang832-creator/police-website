@@ -50,7 +50,7 @@
 
       <div style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
-          <span>Jam Duty (sudah diterima HC) minggu ini</span>
+          <span>Jam Duty Bulanan</span>
           <span id="promosi-jam-label">0/30 jam</span>
         </div>
         <div class="progress-track"><div class="progress-fill" id="promosi-jam-bar" style="width:0%"></div></div>
@@ -341,7 +341,7 @@
       return;
     }
 
-    subEl.textContent = `Menuju pangkat ${promosiInfo.pangkatTarget}. Progress dihitung Senin–Minggu minggu berjalan, dan jam duty cuma yang statusnya "diterima" High Command.`;
+    subEl.textContent = `Menuju pangkat ${promosiInfo.pangkatTarget}. Kalian wajib menyelesaikan target mission dari HC..`;
 
     const arrestPct = Math.min(100, Math.round((promosiInfo.arrestMingguIni / promosiInfo.targetArrest) * 100));
     const jamPct = Math.min(100, Math.round((promosiInfo.jamMingguIni / promosiInfo.targetJam) * 100));
