@@ -14,6 +14,26 @@ Struktur tetap serverless (cocok Vercel):
 - **Password** → di-hash pakai `scrypt` bawaan Node (nggak pernah disimpan
   polos, dan nggak pernah dikirim balik ke browser lewat API manapun)
 
+## Login: Anggota vs Warga
+
+- **Anggota** — username + password (dibuatkan High Command). **Tidak ada
+  pendaftaran mandiri lagi** (`register.html` dihapus, endpoint `daftar` dicabut).
+- **Warga / publik** — tombol "Login dengan Discord" di `index.html`, masuk ke
+  `warga.html` (dashboard publik: profil Discord + papan pengumuman/iklan).
+  Data warga disimpan terpisah di key `nexotis:warga`; cookie sesinya beda
+  (`nexotis_warga`) jadi warga tidak bisa akses halaman/API anggota.
+- Login Discord numpang di `api/auth-login.js` (GET) karena function Vercel
+  Hobby sudah mentok 12.
+
+### Setup login Discord (sekali saja)
+1. https://discord.com/developers/applications → pilih/buat Application →
+   **OAuth2** → copy **Client ID** & **Client Secret**
+2. Di **OAuth2 → Redirects**, tambah: `https://DOMAIN-KAMU.vercel.app/api/auth-login`
+   (harus persis sama, tanpa garis miring di akhir)
+3. Environment Variables Vercel: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`
+   (opsional `DISCORD_REDIRECT_URI` kalau mau paksa URL redirect tertentu)
+4. Redeploy
+
 ## Alur pemakaian
 
 1. **Setup awal (SEKALI SAJA)** — buka `/setup.html`, isi `SETUP_SECRET`

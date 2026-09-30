@@ -12,7 +12,7 @@
     <div class="login-card">
       <div class="flag">🚔</div>
       <h1>KEPOLISIAN NEXOTIS</h1>
-      <p>Masuk dengan akun yang diberikan Petinggi. Belum punya akun? <a href="register.html" style="color: red; font-weight: bold;">Daftar di sini</a>.</p>
+      <p>Anggota: masuk dengan akun yang diberikan Petinggi.</p>
   
       <div class="form-group" style="text-align:left">
         <label for="username">Username</label>
@@ -24,6 +24,11 @@
       </div>
       <button class="btn btn-primary" style="width:100%" id="login-btn">Masuk</button>
       <div class="error-msg" id="error-msg"></div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--faint);font-size:12px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>warga / umum<div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <a class="btn" href="/api/auth-login?aksi=discord" style="display:block;box-sizing:border-box;width:100%;text-align:center;text-decoration:none;background:#5865F2;color:#fff">Login dengan Discord</a>
       <div class="foot">© 2026 Kepolisian Nexotis</div>
     </div>
   </div>
@@ -32,9 +37,15 @@
 <script>
   // Kalau sesi masih aktif, langsung ke dashboard
   (async () => {
-    try { await api("/api/me"); window.location.href = "dashboard.html"; }
+    try { await api("/api/me"); window.location.href = "dashboard.html"; return; }
+    catch (e) { /* bukan anggota */ }
+    try { await api("/api/auth-login?aksi=warga-me"); window.location.href = "warga.html"; }
     catch (e) { /* belum login, tetap di sini */ }
   })();
+
+  // Pesan error dari alur login Discord (?err=...)
+  const errQuery = new URLSearchParams(location.search).get("err");
+  if (errQuery) document.getElementById("error-msg").textContent = errQuery;
 
   document.getElementById("login-btn").addEventListener("click", doLogin);
   document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
