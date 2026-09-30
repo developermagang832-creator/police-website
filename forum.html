@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kepolisian Nexotis - Kritik & Saran</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .f-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+    .f-item { border:1px solid var(--border); border-radius:10px; padding:12px; margin-top:10px; cursor:pointer; background:#fff; }
+    .f-item:hover { border-color: var(--red); }
+    .f-meta { font-size:11px; color:var(--faint); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .f-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; }
+    .f-tag.kritik { background:rgba(239,68,68,.12); color:#dc2626; }
+    .f-tag.saran { background:rgba(16,185,129,.15); color:var(--green); }
+    .f-role { font-size:10px; padding:2px 6px; border-radius:6px; background:rgba(255,122,162,.15); color:var(--red); font-weight:700; }
+    .f-ava { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,var(--red),var(--red-light)); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; background-size:cover; flex-shrink:0; }
+    .f-komen { border-top:1px solid var(--border); padding:10px 0; }
+    .f-del { background:none; border:none; color:var(--danger,#dc2626); font-size:11px; cursor:pointer; padding:0; }
+  </style>
+</head>
+<body>
+  <div id="navbar-mount"></div>
+
+  <div class="container" style="max-width:820px;margin:20px auto;padding:0 14px">
+    <!-- DAFTAR POSTINGAN -->
+    <div id="view-list">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0">💬 Forum Kritik &amp; Saran</h2>
+          <button class="btn btn-primary" id="btn-buat">＋ Buat Postingan</button>
+        </div>
+        <div id="compose" style="display:none;margin-top:14px">
+          <div class="form-group">
+            <label for="f-jenis">Jenis</label>
+            <select id="f-jenis"><option value="saran">💡 Saran</option><option value="kritik">📣 Kritik</option></select>
+          </div>
+          <div class="form-group"><label for="f-judul">Judul</label><input type="text" id="f-judul" maxlength="100" placeholder="ringkas aja"></div>
+          <div class="form-group"><label for="f-isi">Isi</label><textarea id="f-isi" maxlength="2000" placeholder="tulis kritik / saran kamu di sini"></textarea></div>
+          <div class="error-msg" id="compose-error"></div>
+          <button class="btn btn-primary" id="btn-kirim">Kirim</button>
+          <button class="btn btn-secondary" id="btn-batal">Batal</button>
+        </div>
+        <div class="f-tabs" id="f-tabs">
+          <button class="btn btn-secondary filter-btn active" data-f="semua">Semua</button>
+          <button class="btn btn-secondary filter-btn" data-f="saran">Saran</button>
+          <button class="btn btn-secondary filter-btn" data-f="kritik">Kritik</button>
+        </div>
+        <div id="list"></div>
+      </div>
+    </div>
+
+    <!-- DETAIL POSTINGAN + KOMENTAR -->
+    <div id="view-detail" style="display:none">
+      <div class="card">
+        <button class="btn btn-secondary" id="btn-kembali" style="margin-bottom:12px">← Kembali</button>
+        <div id="detail"></div>
+        <h2 style="margin-top:18px;font-size:14px">Komentar</h2>
+        <div id="komentar-list"></div>
+        <div class="form-group" style="margin-top:12px">
+          <textarea id="k-isi" maxlength="500" placeholder="tulis komentar..."></textarea>
+        </div>
+        <div class="error-msg" id="komen-error"></div>
+        <button class="btn btn-primary" id="btn-komen">Kirim Komentar</button>
+      </div>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+<script>
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const waktu = (iso) => { try { return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+  const ROLE = { warga: "", anggota: "Anggota PD", hc: "High Command" };
+  const F = (aksi, extra = "") => `/api/auth-login?aksi=${aksi}${extra}`;
+
+  let semuaPost = [], filter = "semua", postAktif = null;
+
+  function avatar(nama, url) {
+    const style = url && String(url).startsWith("https://") ? ` style="background-image:url('${esc(url)}')"` : "";
+    return `<div class="f-ava"${style}>${url ? "" : esc((nama || "?").slice(0, 2).toUpperCase())}</div>`;
+  }
+  function penulisHtml(o) {
+    return `${avatar(o.penulisNama, o.penulisAvatar)}<b style="color:var(--text)">${esc(o.penulisNama)}</b>
+      ${ROLE[o.penulisTipe] ? `<span class="f-role">${ROLE[o.penulisTipe]}</span>` : ""}<span>· ${waktu(o.tanggal)}</span>`;
+  }
+
+  (async () => {
+    // Anggota (user/password) atau warga (Discord)? Anggota pakai navbar lengkap.
+    const mount = document.getElementById("navbar-mount");
+    try {
+      const data = await api("/api/me");
+      renderNavbar("forum", data.user);
+    } catch (e) {
+      try { await api(F("warga-me")); }
+      catch (e2) { window.location.href = "index.html"; return; }
+      mount.innerHTML = `
+        <div class="navbar">
+          <div class="brand"><span class="flag">🚔</span> kepolisian nexotis</div>
+          <div style="flex:1"></div>
+          <a class="btn btn-secondary" href="warga.html" style="text-decoration:none;margin-right:8px">Dashboard</a>
+          <button class="btn btn-secondary" id="logout-btn">Logout</button>
+        </div>`;
+      document.getElementById("logout-btn").addEventListener("click", async () => {
+        try { await api(F("warga-logout"), { method: "POST" }); } catch (x) { /* lanjut */ }
+        window.location.href = "index.html";
+      });
+    }
+    await muatList();
+  })();
+
+  async function muatList() {
+    try { semuaPost = (await api(F("forum-list"))).posts; renderList(); }
+    catch (e) { document.getElementById("list").innerHTML = `<div class="error-msg">${esc(e.message)}</div>`; }
+  }
+
+  function renderList() {
+    const data = semuaPost.filter((p) => filter === "semua" || p.jenis === filter);
+    document.getElementById("list").innerHTML = data.length ? data.map((p) => `
+      <div class="f-item" data-id="${esc(p.id)}">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <span class="f-tag ${p.jenis}">${p.jenis === "kritik" ? "📣 Kritik" : "💡 Saran"}</span>
+          <b style="font-size:14px">${esc(p.judul)}</b>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(p.cuplikan)}${p.cuplikan.length >= 140 ? "…" : ""}</div>
+        <div class="f-meta">${penulisHtml(p)}<span>· 💬 ${p.jumlahKomentar}</span></div>
+      </div>`).join("") : `<div class="kalkulator-empty">Belum ada postingan. Jadi yang pertama!</div>`;
+    document.querySelectorAll(".f-item").forEach((el) => el.addEventListener("click", () => bukaPost(el.dataset.id)));
+  }
+
+  document.querySelectorAll("#f-tabs button").forEach((b) => b.addEventListener("click", () => {
+    filter = b.dataset.f;
+    document.querySelectorAll("#f-tabs button").forEach((x) => x.classList.toggle("active", x === b));
+    renderList();
+  }));
+
+  // ---- buat postingan ----
+  const compose = document.getElementById("compose");
+  document.getElementById("btn-buat").addEventListener("click", () => { compose.style.display = compose.style.display === "none" ? "block" : "none"; });
+  document.getElementById("btn-batal").addEventListener("click", () => { compose.style.display = "none"; });
+  document.getElementById("btn-kirim").addEventListener("click", async () => {
+    const err = document.getElementById("compose-error"); err.textContent = "";
+    const btn = document.getElementById("btn-kirim"); btn.disabled = true;
+    try {
+      await api(F("forum-buat"), { method: "POST", body: JSON.stringify({
+        jenis: document.getElementById("f-jenis").value,
+        judul: document.getElementById("f-judul").value,
+        isi: document.getElementById("f-isi").value,
+      }) });
+      document.getElementById("f-judul").value = ""; document.getElementById("f-isi").value = "";
+      compose.style.display = "none";
+      await muatList();
+    } catch (e) { err.textContent = e.message; }
+    finally { btn.disabled = false; }
+  });
+
+  // ---- detail + komentar ----
+  async function bukaPost(id) {
+    try {
+      const { post } = await api(F("forum-post", "&id=" + encodeURIComponent(id)));
+      postAktif = post; renderDetail();
+      document.getElementById("view-list").style.display = "none";
+      document.getElementById("view-detail").style.display = "block";
+      window.scrollTo(0, 0);
+    } catch (e) { alert(e.message); await muatList(); }
+  }
+
+  function renderDetail() {
+    const p = postAktif;
+    document.getElementById("detail").innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <span class="f-tag ${p.jenis}">${p.jenis === "kritik" ? "📣 Kritik" : "💡 Saran"}</span>
+        <b style="font-size:16px">${esc(p.judul)}</b>
+      </div>
+      <div class="f-meta" style="margin-bottom:12px">${penulisHtml(p)}
+        ${p.bolehHapus ? `<button class="f-del" id="hapus-post">Hapus</button>` : ""}</div>
+      <div style="font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(p.isi)}</div>`;
+    document.getElementById("komentar-list").innerHTML = p.komentar.length ? p.komentar.map((k) => `
+      <div class="f-komen">
+        <div class="f-meta" style="margin-bottom:4px">${penulisHtml(k)}
+          ${k.bolehHapus ? `<button class="f-del" data-k="${esc(k.id)}">Hapus</button>` : ""}</div>
+        <div style="font-size:13px;white-space:pre-wrap;word-break:break-word">${esc(k.isi)}</div>
+      </div>`).join("") : `<div class="kalkulator-empty">Belum ada komentar.</div>`;
+
+    const hp = document.getElementById("hapus-post");
+    if (hp) hp.addEventListener("click", async () => {
+      if (!confirm("Hapus postingan ini beserta komentarnya?")) return;
+      try { await api(F("forum-hapus"), { method: "POST", body: JSON.stringify({ id: p.id }) }); kembali(); }
+      catch (e) { alert(e.message); }
+    });
+    document.querySelectorAll("#komentar-list .f-del").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm("Hapus komentar ini?")) return;
+      try { await api(F("forum-hapus"), { method: "POST", body: JSON.stringify({ id: p.id, komentarId: b.dataset.k }) }); await bukaPost(p.id); }
+      catch (e) { alert(e.message); }
+    }));
+  }
+
+  document.getElementById("btn-komen").addEventListener("click", async () => {
+    const err = document.getElementById("komen-error"); err.textContent = "";
+    const btn = document.getElementById("btn-komen"); btn.disabled = true;
+    try {
+      await api(F("forum-komen"), { method: "POST", body: JSON.stringify({ id: postAktif.id, isi: document.getElementById("k-isi").value }) });
+      document.getElementById("k-isi").value = "";
+      await bukaPost(postAktif.id);
+    } catch (e) { err.textContent = e.message; }
+    finally { btn.disabled = false; }
+  });
+
+  async function kembali() {
+    document.getElementById("view-detail").style.display = "none";
+    document.getElementById("view-list").style.display = "block";
+    await muatList();
+  }
+  document.getElementById("btn-kembali").addEventListener("click", kembali);
+</script>
+</body>
+</html>

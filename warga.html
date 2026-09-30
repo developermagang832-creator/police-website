@@ -30,13 +30,23 @@
       <div id="w-info" style="font-size:12px;color:var(--faint);margin-top:10px"></div>
     </div>
 
-    <div class="card" id="iklan-card" style="display:none">
-      <h2>📢 Papan Pengumuman &amp; Iklan</h2>
-      <div id="iklan-list"></div>
+    <div class="card">
+      <h2>💬 Forum Kritik &amp; Saran</h2>
+      <p style="font-size:13px;color:var(--muted);margin:6px 0 12px">
+        Punya kritik atau saran buat Kepolisian Nexotis? Tulis di forum, dan warga lain bisa ikut berkomentar.
+      </p>
+      <a class="btn btn-primary" href="forum.html" style="display:inline-block;text-decoration:none">Buka Forum</a>
     </div>
-    <div class="card" id="iklan-kosong" style="display:none">
-      <h2>📢 Papan Pengumuman &amp; Iklan</h2>
-      <div class="kalkulator-empty">Belum ada pengumuman saat ini.</div>
+  </div>
+
+  <!-- Popup Iklan (sama seperti dashboard anggota) -->
+  <div class="modal-overlay" id="iklan-modal">
+    <div class="modal-box" style="max-width:420px;text-align:left">
+      <div id="iklan-modal-content"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <div id="iklan-modal-nav" style="font-size:12px;color:var(--faint)"></div>
+        <button class="btn btn-secondary" id="iklan-modal-close">Tutup</button>
+      </div>
     </div>
   </div>
 
@@ -49,6 +59,26 @@
     try { return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }); }
     catch (e) { return "-"; }
   }
+
+  // ====== Popup Iklan: muncul sekali tiap halaman dibuka / di-refresh ======
+  let iklanList = [];
+  let iklanIndex = 0;
+  function renderIklanModal() {
+    const k = iklanList[iklanIndex];
+    document.getElementById("iklan-modal-content").innerHTML = `
+      ${k.foto && String(k.foto).startsWith("http") ? `<img src="${esc(k.foto)}" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-bottom:12px">` : ""}
+      ${k.teks ? `<div style="font-size:13px;white-space:pre-wrap">${esc(k.teks)}</div>` : ""}`;
+    const navEl = document.getElementById("iklan-modal-nav");
+    if (iklanList.length > 1) {
+      navEl.innerHTML = `
+        <button class="btn-link" id="iklan-prev" ${iklanIndex === 0 ? "disabled" : ""}>‹ Sebelumnya</button>
+        <span style="margin:0 6px">${iklanIndex + 1}/${iklanList.length}</span>
+        <button class="btn-link" id="iklan-next" ${iklanIndex === iklanList.length - 1 ? "disabled" : ""}>Berikutnya ›</button>`;
+      document.getElementById("iklan-prev").addEventListener("click", () => { if (iklanIndex > 0) { iklanIndex--; renderIklanModal(); } });
+      document.getElementById("iklan-next").addEventListener("click", () => { if (iklanIndex < iklanList.length - 1) { iklanIndex++; renderIklanModal(); } });
+    } else navEl.innerHTML = "";
+  }
+  document.getElementById("iklan-modal-close").addEventListener("click", () => document.getElementById("iklan-modal").classList.remove("open"));
 
   (async () => {
     let data;
@@ -63,16 +93,8 @@
     else av.textContent = w.nama.slice(0, 2).toUpperCase();
     document.getElementById("w-info").textContent = `Discord: @${w.username} · Login terakhir: ${tgl(w.terakhirLogin)}`;
 
-    const iklan = data.iklan || [];
-    if (!iklan.length) { document.getElementById("iklan-kosong").style.display = "block"; }
-    else {
-      document.getElementById("iklan-card").style.display = "block";
-      document.getElementById("iklan-list").innerHTML = iklan.map((k) => `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px">
-          ${k.foto && String(k.foto).startsWith("http") ? `<img src="${esc(k.foto)}" style="width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin-bottom:10px">` : ""}
-          ${k.teks ? `<div style="font-size:13px;white-space:pre-wrap">${esc(k.teks)}</div>` : ""}
-        </div>`).join("");
-    }
+    iklanList = data.iklan || [];
+    if (iklanList.length) { iklanIndex = 0; renderIklanModal(); document.getElementById("iklan-modal").classList.add("open"); }
   })();
 
   document.getElementById("logout-btn").addEventListener("click", async () => {

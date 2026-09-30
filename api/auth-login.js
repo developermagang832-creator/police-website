@@ -1,6 +1,7 @@
 const kvStore = require("../lib/kv");
 const { verifyPassword } = require("../lib/password");
-const { setSessionCookie, sanitizeUser } = require("../lib/auth");
+const { setSessionCookie, sanitizeUser, getUserFromReq } = require("../lib/auth");
+const crypto = require("crypto");
 const warga = require("../lib/warga");
 
 const SESSION_TTL_SEC = 12 * 60 * 60;
@@ -87,7 +88,7 @@ async function handleWargaGet(req, res) {
       const now = new Date().toISOString();
       let w = list.find((x) => x.discordId === dc.id);
       if (!w) {
-        w = { id: require("crypto").randomBytes(8).toString("hex"), discordId: dc.id, pertamaLogin: now };
+        w = { id: crypto.randomBytes(8).toString("hex"), discordId: dc.id, pertamaLogin: now };
         list.push(w);
       }
       w.username = dc.username;
@@ -107,7 +108,135 @@ async function handleWargaGet(req, res) {
   return res.status(400).json({ error: "Permintaan tidak dikenal." });
 }
 
+
+// ====== Forum Kritik & Saran ======
+// Juga numpang di endpoint ini (limit 12 function). Boleh diakses warga
+// (login Discord) DAN anggota (login user/password). Hapus: pemilik konten
+// atau High Command.
+const MAX_POSTS = 300;
+const MAX_KOMENTAR = 200;
+
+async function getForumActor(req) {
+  const w = await warga.getWargaFromReq(req);
+  if (w) {
+    const s = warga.sanitizeWarga(w);
+    return { tipe: "warga", id: "w:" + w.id, nama: s.nama, avatar: s.avatar, hc: false };
+  }
+  const u = await getUserFromReq(req);
+  if (u && (u.status || "approved") === "approved") {
+    // avatar anggota berupa data-URL besar -> jangan disimpan di forum, pakai inisial
+    return { tipe: u.isHighCommand ? "hc" : "anggota", id: "u:" + u.id, nama: u.namaKarakter || u.username, avatar: null, hc: !!u.isHighCommand };
+  }
+  return null;
+}
+
+const potong = (t, n) => String(t == null ? "" : t).trim().slice(0, n);
+const penulis = (o) => ({ id: o.id, penulisNama: o.penulisNama, penulisAvatar: o.penulisAvatar || null, penulisTipe: o.penulisTipe, tanggal: o.tanggal });
+
+async function handleForum(req, res, aksi) {
+  let actor;
+  try { actor = await getForumActor(req); }
+  catch (err) { return res.status(500).json({ error: "Gagal konek ke database." }); }
+  if (!actor) return res.status(401).json({ error: "Belum login." });
+
+  const q = req.query || {};
+  const body = req.body || {};
+  const forum = await kvStore.getForum();
+  const bolehHapus = (item) => actor.hc || item.penulisId === actor.id;
+
+  if (aksi === "forum-list" && req.method === "GET") {
+    const posts = forum
+      .map((p) => ({
+        id: p.id, jenis: p.jenis, judul: p.judul,
+        cuplikan: p.isi.slice(0, 140),
+        ...penulis(p),
+        jumlahKomentar: (p.komentar || []).length,
+        terakhir: p.terakhir || p.tanggal,
+        bolehHapus: bolehHapus(p),
+      }))
+      .sort((a, b) => b.terakhir.localeCompare(a.terakhir));
+    return res.json({ peran: actor.tipe, posts });
+  }
+
+  if (aksi === "forum-post" && req.method === "GET") {
+    const p = forum.find((x) => x.id === q.id);
+    if (!p) return res.status(404).json({ error: "Postingan tidak ditemukan." });
+    return res.json({
+      peran: actor.tipe,
+      post: {
+        id: p.id, jenis: p.jenis, judul: p.judul, isi: p.isi, ...penulis(p), bolehHapus: bolehHapus(p),
+        komentar: (p.komentar || []).map((k) => ({ ...penulis(k), isi: k.isi, bolehHapus: bolehHapus(k) })),
+      },
+    });
+  }
+
+  if (req.method !== "POST") return res.status(405).json({ error: "Method tidak didukung." });
+  const sekarang = new Date().toISOString();
+  const jeda = (iso, detik) => iso && Date.now() - new Date(iso).getTime() < detik * 1000;
+
+  if (aksi === "forum-buat") {
+    const jenis = body.jenis === "kritik" ? "kritik" : body.jenis === "saran" ? "saran" : null;
+    const judul = potong(body.judul, 100);
+    const isi = potong(body.isi, 2000);
+    if (!jenis) return res.status(400).json({ error: "Pilih jenis: Kritik atau Saran." });
+    if (judul.length < 3) return res.status(400).json({ error: "Judul minimal 3 karakter." });
+    if (isi.length < 5) return res.status(400).json({ error: "Isi minimal 5 karakter." });
+    const terakhirSaya = forum.filter((p) => p.penulisId === actor.id).map((p) => p.tanggal).sort().pop();
+    if (jeda(terakhirSaya, 30)) return res.status(429).json({ error: "Tunggu sebentar sebelum membuat postingan lagi." });
+
+    const post = {
+      id: crypto.randomBytes(6).toString("hex"), jenis, judul, isi,
+      penulisId: actor.id, penulisNama: actor.nama, penulisAvatar: actor.avatar, penulisTipe: actor.tipe,
+      tanggal: sekarang, terakhir: sekarang, komentar: [],
+    };
+    forum.push(post);
+    while (forum.length > MAX_POSTS) forum.shift();
+    await kvStore.setForum(forum);
+    return res.json({ ok: true, id: post.id });
+  }
+
+  if (aksi === "forum-komen") {
+    const p = forum.find((x) => x.id === body.id);
+    if (!p) return res.status(404).json({ error: "Postingan tidak ditemukan." });
+    const isi = potong(body.isi, 500);
+    if (!isi) return res.status(400).json({ error: "Komentar tidak boleh kosong." });
+    p.komentar = p.komentar || [];
+    if (p.komentar.length >= MAX_KOMENTAR) return res.status(400).json({ error: "Komentar di postingan ini sudah penuh." });
+    const terakhirSaya = p.komentar.filter((k) => k.penulisId === actor.id).map((k) => k.tanggal).sort().pop();
+    if (jeda(terakhirSaya, 5)) return res.status(429).json({ error: "Pelan-pelan, tunggu beberapa detik." });
+    p.komentar.push({
+      id: crypto.randomBytes(6).toString("hex"), isi,
+      penulisId: actor.id, penulisNama: actor.nama, penulisAvatar: actor.avatar, penulisTipe: actor.tipe, tanggal: sekarang,
+    });
+    p.terakhir = sekarang;
+    await kvStore.setForum(forum);
+    return res.json({ ok: true });
+  }
+
+  if (aksi === "forum-hapus") {
+    const idx = forum.findIndex((x) => x.id === body.id);
+    if (idx === -1) return res.status(404).json({ error: "Postingan tidak ditemukan." });
+    const p = forum[idx];
+    if (body.komentarId) {
+      const kIdx = (p.komentar || []).findIndex((k) => k.id === body.komentarId);
+      if (kIdx === -1) return res.status(404).json({ error: "Komentar tidak ditemukan." });
+      if (!bolehHapus(p.komentar[kIdx])) return res.status(403).json({ error: "Kamu tidak boleh menghapus komentar ini." });
+      p.komentar.splice(kIdx, 1);
+    } else {
+      if (!bolehHapus(p)) return res.status(403).json({ error: "Kamu tidak boleh menghapus postingan ini." });
+      forum.splice(idx, 1);
+    }
+    await kvStore.setForum(forum);
+    return res.json({ ok: true });
+  }
+
+  return res.status(400).json({ error: "Aksi tidak dikenal." });
+}
+
 module.exports = async (req, res) => {
+  const aksi = req.query && req.query.aksi;
+  if (typeof aksi === "string" && aksi.startsWith("forum-")) return handleForum(req, res, aksi);
+
   // Warga (login Discord)
   if (req.method === "GET") return handleWargaGet(req, res);
   if (req.method === "POST" && req.query && req.query.aksi === "warga-logout") {

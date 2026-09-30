@@ -25,6 +25,13 @@ Struktur tetap serverless (cocok Vercel):
 - Login Discord numpang di `api/auth-login.js` (GET) karena function Vercel
   Hobby sudah mentok 12.
 
+### Forum Kritik & Saran (`forum.html`)
+- Warga & anggota bisa bikin postingan (Kritik/Saran) dan saling komen.
+- Hapus postingan/komentar: pemilik konten atau High Command.
+- Data di key `nexotis:forum` (maks 300 postingan, 200 komentar/postingan),
+  ada jeda anti-spam (30 dtk per postingan, 5 dtk per komentar).
+- Iklan di dashboard warga tampil sebagai popup (sekali tiap halaman dibuka).
+
 ### Setup login Discord (sekali saja)
 1. https://discord.com/developers/applications → pilih/buat Application →
    **OAuth2** → copy **Client ID** & **Client Secret**

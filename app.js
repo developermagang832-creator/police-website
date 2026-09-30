@@ -141,6 +141,7 @@ function renderNavbar(activePage, user) {
     ["undang-undang.html", "Undang-Undang", "undang-undang"],
     ["arrest-record.html", "Arrest Record", "arrest-record"],
     ["struktur.html", "Struktur Anggota", "struktur"],
+    ["forum.html", "Kritik & Saran", "forum"],
   ];
   const navLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
   const navMenuLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
