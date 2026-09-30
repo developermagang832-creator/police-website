@@ -48,6 +48,12 @@
     .edtb { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
     .edtb button { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; min-width: 30px; }
     .pad { padding: 14px; border-top: 1px solid var(--border); }
+    .side a.nm { display: block; color: var(--text); font-size: 13px; font-weight: 700; word-break: break-word; }
+    .side a.nm:hover { color: var(--red); }
+    .side .lbls { justify-content: center; margin: 6px 0 2px; }
+    .side .bio { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--muted); font-style: italic; word-break: break-word; max-height: 66px; overflow: hidden; }
+    .box-h, .panel-h { letter-spacing: .1px; }
+    .hero { animation: none; }
 
     /* Animasi ringan: cuma opacity & transform (murah di HP), mati otomatis kalau reduce-motion */
     @keyframes fu { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -72,7 +78,7 @@
     .lb.open { display: flex; animation: fin .2s ease; }
     .lb img { max-width: 100%; max-height: 100%; border-radius: 8px; }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-    @media (max-width: 640px) { .post { flex-direction: column; } .side { width: auto; display: flex; gap: 10px; align-items: center; text-align: left; border-right: none; border-bottom: 1px solid var(--border); } .side .ava { margin: 0; width: 38px; height: 38px; font-size: 13px; } .last, .num.hp { display: none; } .fg img { height: 100px; } }
+    @media (max-width: 640px) { .post { flex-direction: column; } .side { width: auto; display: flex; gap: 10px; align-items: center; text-align: left; border-right: none; border-bottom: 1px solid var(--border); } .side .ava { margin: 0; width: 38px; height: 38px; font-size: 13px; } .last, .num.hp { display: none; } .fg img { height: 100px; } .side .lbls { justify-content: flex-start; } .side .bio { display: none; } }
   </style>
 </head>
 <body>
@@ -85,7 +91,6 @@
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const F = (aksi, o = {}) => `/api/auth-login?aksi=${aksi}` + Object.entries(o).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join("");
   const POST = (aksi, body) => api(F(aksi), { method: "POST", body: JSON.stringify(body) });
-  const ROLE = { warga: "Warga", anggota: "Anggota PD", hc: "High Command" };
   const RX = { suka: "Suka", cinta: "Cinta", haha: "Lucu", wow: "Wow", sedih: "Sedih" };
   // Ikon SVG kecil (tanpa emoji, tanpa file gambar tambahan)
   const IC = {
@@ -106,6 +111,8 @@
   const app = $("app");
   const waktu = (iso) => { try { return new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
   const tgl = (iso) => { try { return new Date(iso).toLocaleDateString("id-ID", { month: "short", year: "numeric" }); } catch (e) { return "-"; } };
+  const rel = (iso) => { const s = (Date.now() - new Date(iso).getTime()) / 1000; if (!isFinite(s)) return ""; if (s < 60) return "baru saja"; if (s < 3600) return Math.floor(s / 60) + " mnt lalu"; if (s < 86400) return Math.floor(s / 3600) + " jam lalu"; if (s < 86400 * 7) return Math.floor(s / 86400) + " hari lalu"; return waktu(iso); };
+  const feed = (t) => `<div class="feed"><div class="ico" data-k="${esc(t.kat)}">${svg(t.pin ? "pin" : t.kat, 20)}</div><div class="fm"><a class="ft" href="#/t/${esc(t.id)}">${esc(t.judul)}</a><div class="fs">${esc(t.katNama)} · ${esc(t.nama)} · ${rel(t.tanggal)}</div></div><span class="chip" title="balasan">${t.balasan}</span></div>`;
   const ava = (nama, url, cls = "") => `<div class="ava ${cls}" ${url && String(url).startsWith("https://") ? `style="background-image:url('${esc(url)}')"` : ""}>${url ? "" : esc((nama || "?").slice(0, 2).toUpperCase())}</div>`;
 
   // ---------- Upload foto (dikompres di browser dulu biar ringan) ----------
@@ -194,11 +201,15 @@
         <form id="cari-f" style="display:flex;gap:6px"><input type="text" id="cari-q" placeholder="cari topik..." style="width:160px"><button class="btn btn-primary">Cari</button></form></div>
         ${d.kategori.map((k, i) => `
         <div class="row" style="--i:${i}">
-          <div class="ico">${svg(k.id)}</div>
+          <div class="ico" data-k="${k.id}">${svg(k.id)}</div>
           <div class="main"><a class="t" href="#/k/${k.id}">${esc(k.nama)}</a><div class="sub">${esc(k.desk)}${k.hanyaHC ? " · <span class=tag>HC only</span>" : ""}</div></div>
           <div class="num hp"><b>${k.topik}</b>topik</div><div class="num hp"><b>${k.post}</b>post</div>
           <div class="last">${k.terakhir ? `<a href="#/t/${k.terakhir.id}" style="color:var(--text);font-weight:600;text-decoration:none">${esc(k.terakhir.judul.slice(0, 32))}</a><div class="sub">${esc(k.terakhir.nama)} · ${waktu(k.terakhir.tanggal)}</div>` : `<span class="sub">Belum ada topik</span>`}</div>
         </div>`).join("")}</div>
+      <div class="cols">
+        <div class="panel"><div class="panel-h"><span>Aktivitas Terbaru</span></div>${d.aktivitas && d.aktivitas.length ? d.aktivitas.map(feed).join("") : `<div class="kosong">Belum ada aktivitas.</div>`}</div>
+        <div class="panel"><div class="panel-h"><span>Paling Banyak Dibaca</span></div>${d.populer && d.populer.length ? d.populer.map(feed).join("") : `<div class="kosong">Belum ada topik populer.</div>`}</div>
+      </div>
       <div class="box"><div class="box-h">Statistik</div><div class="pad" style="font-size:13px;display:flex;gap:24px;flex-wrap:wrap">
         <span><b>${d.stat.topik}</b> topik</span><span><b>${d.stat.post}</b> post</span><span><b>${d.stat.warga}</b> warga terdaftar</span></div></div>`;
     $("cari-f").addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/k/semua?q=${encodeURIComponent($("cari-q").value)}`; });
@@ -223,7 +234,7 @@
           <button class="btn btn-secondary">Terapkan</button></form>
         ${d.topik.length ? d.topik.map((t, i) => `
         <div class="row" style="--i:${i}">
-          ${t.thumb && aman(t.thumb) ? `<img class="th" loading="lazy" src="${esc(cld(t.thumb, "c_fill,w_96,h_96,q_auto,f_auto"))}" alt="">` : `<div class="ico">${svg(t.pin ? "pin" : t.kunci ? "kunci" : t.kat)}</div>`}
+          ${t.thumb && aman(t.thumb) ? `<img class="th" loading="lazy" src="${esc(cld(t.thumb, "c_fill,w_96,h_96,q_auto,f_auto"))}" alt="">` : `<div class="ico" data-k="${esc(t.kat)}">${svg(t.pin ? "pin" : t.kunci ? "kunci" : t.kat)}</div>`}
           <div class="main"><a class="t" href="#/t/${t.id}">${esc(t.judul)}</a>
             <div class="sub">${t.pin ? `<span class="tag">Pin</span>` : ""}${id === "semua" ? `<span class="tag">${esc(t.kat)}</span>` : ""}${t.kunci ? `<span class="tag">Dikunci</span>` : ""}oleh ${esc(t.penulisNama)}, ${waktu(t.tanggal)}</div></div>
           <div class="num hp"><b>${t.balasan}</b>balasan</div><div class="num hp"><b>${t.views}</b>dilihat</div>
@@ -260,8 +271,8 @@
           <button class="btn btn-secondary" id="m-pindah">Pindahkan</button></div>` : ""}
         ${d.posts.map((x, i) => `
         <div class="post" id="p-${x.id}" style="--i:${i}">
-          <div class="side">${ava(x.penulisNama, x.penulisAvatar, "")}<div><b>${esc(x.penulisNama)}</b><span class="tag">${ROLE[x.penulisTipe] || ""}</span>
-            <div style="margin-top:4px">${x.sejak ? `Sejak ${tgl(x.sejak)}<br>` : ""}${x.jumlahPost} post</div></div></div>
+          <div class="side"><a href="#/u/${encodeURIComponent(x.penulisId)}" style="display:block">${ava(x.penulisNama, x.penulisAvatar, "")}</a><div><a class="nm" href="#/u/${encodeURIComponent(x.penulisId)}">${esc(x.penulisNama)}</a><div class="lbls">${renderLabels(x.labels, true)}</div>${x.bio ? `<div class="bio">${esc(x.bio)}</div>` : ""}
+            <div style="margin-top:6px">${x.sejak ? `Sejak ${tgl(x.sejak)}<br>` : ""}${x.jumlahPost} post</div></div></div>
           <div class="body"><div class="meta"><span>${waktu(x.tanggal)}${x.edit ? ` · diedit ${waktu(x.edit)}` : ""}</span><span>#${x.no}</span></div>
             <div class="content" id="c-${x.id}">${bb(x.isi)}</div>${fotoHtml(x.foto)}
             <div class="acts">
@@ -303,6 +314,26 @@
       catch (e) { $("r-err").textContent = e.message; $("r-kirim").disabled = false; }
     });
   }
+  // ---------- Halaman: profil penulis ----------
+  async function profil(id) {
+    const d = await api(F("forum-profil", { id }));
+    app.innerHTML = `
+      <div class="crumb"><a href="#/">Forum</a> › <b>${esc(d.nama)}</b></div>
+      <div class="hero">
+        <div class="hero-banner" ${d.banner && aman(d.banner) ? `style="background-image:url('${esc(d.banner)}')"` : ""}></div>
+        <div class="hero-body">
+          ${ava(d.nama, d.avatar, "hero-ava")}
+          <div class="hero-main">
+            <div class="hero-name">${esc(d.nama)}</div>
+            <div class="lbls">${renderLabels(d.labels)}</div>
+            <p class="hero-bio ${d.bio ? "" : "kosong"}">${d.bio ? esc(d.bio) : "Belum ada bio."}</p>
+            <div class="hero-meta">${d.sejak ? `Bergabung ${tgl(d.sejak)} · ` : ""}${d.jumlahPost} post · ${d.jumlahTopik} topik</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-h"><span>Topik oleh ${esc(d.nama)}</span></div>
+        ${d.topik.length ? d.topik.map((t) => feed({ ...t, katNama: t.kat, nama: t.terakhir.nama, tanggal: t.terakhir.tanggal })).join("") : `<div class="kosong">Belum bikin topik.</div>`}</div>`;
+  }
   async function aksi(fn) { try { await fn(); route(true); } catch (e) { alert(e.message); } }
 
   // ---------- Router ----------
@@ -313,6 +344,7 @@
     try {
       if (seg[0] === "k" && seg[1]) await kategori(seg[1], p);
       else if (seg[0] === "t" && seg[1]) await topik(seg[1], p);
+      else if (seg[0] === "u" && seg[1]) await profil(decodeURIComponent(seg[1]));
       else await home();
       if (senyap) window.scrollTo(0, y); else if (seg[0] !== "t") window.scrollTo(0, 0);
     } catch (e) { app.innerHTML = `<div class="box"><div class="pad error-msg">${esc(e.message)}</div></div>`; }
@@ -323,10 +355,9 @@
   (async () => {
     try { renderNavbar("forum", (await api("/api/me")).user); }   // anggota: navbar lengkap
     catch (e) {
-      try { await api(F("warga-me")); } catch (e2) { location.href = "index.html"; return; }
-      $("navbar-mount").innerHTML = `<div class="navbar"><div class="brand"><span class="flag">🚔</span> kepolisian nexotis</div><div style="flex:1"></div>
-        <a class="btn btn-secondary" href="warga.html" style="text-decoration:none;margin-right:8px">Dashboard</a><button class="btn btn-secondary" id="logout-btn">Logout</button></div>`;
-      $("logout-btn").addEventListener("click", async () => { try { await POST("warga-logout", {}); } catch (x) { /* lanjut */ } location.href = "index.html"; });
+      let wg;
+      try { wg = (await api(F("warga-me"))).warga; } catch (e2) { location.href = "index.html"; return; }
+      renderWargaNavbar("forum", wg);
     }
     route();
   })();

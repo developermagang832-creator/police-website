@@ -131,7 +131,7 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === "POST") {
-    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar, ajukanPromosi } = req.body || {};
+    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar, bio, ajukanPromosi } = req.body || {};
 
     // ====== Aksi: ajukan Kenaikan Pangkat ======
     // Cuma bisa diajukan kalau target minggu ini (5x arrest + 30 jam duty
@@ -181,7 +181,7 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, request });
     }
 
-    // ====== Aksi: update profil sendiri (nama karakter & foto profil) ======
+    // ====== Aksi: update profil sendiri (nama karakter, bio & foto profil) ======
     if (updateProfile) {
       const users = await kvStore.getUsers();
       const target = users.find((u) => u.id === user.id);
@@ -189,6 +189,9 @@ module.exports = async (req, res) => {
 
       if (namaKarakter !== undefined) {
         target.namaKarakter = String(namaKarakter).trim().slice(0, 100);
+      }
+      if (bio !== undefined) {
+        target.bio = String(bio).replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 300);
       }
       if (avatar !== undefined) {
         if (avatar === null) {

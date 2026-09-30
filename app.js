@@ -1,3 +1,6 @@
+// Logo lencana (SVG inline) — emoji 🚔 nggak tampil di sebagian HP/PC (jadi kotak kosong).
+const LOGO_SVG = '<svg class="logo-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M12 8.2l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" fill="currentColor" stroke="none"/></svg>';
+
 async function api(path, options = {}) {
   const res = await fetch(path, {
     credentials: "include",
@@ -148,7 +151,7 @@ function renderNavbar(activePage, user) {
 
   mount.innerHTML = `
     <div class="navbar">
-      <div class="brand"><span class="flag">🚔</span> kepolisian nexotis</div>
+      <div class="brand"><span class="flag">${LOGO_SVG}</span> kepolisian nexotis</div>
       <nav id="nav-links">${navLinksHtml}</nav>
       <div class="nav-toggle-wrap" id="nav-toggle" style="display:none">
         <button type="button" aria-label="Buka menu navigasi" id="nav-toggle-btn">&#8942;</button>
@@ -280,6 +283,7 @@ function openProfileSettingsModal(user) {
           <button type="button" class="btn-link" id="ps-avatar-remove" style="display:none">Hapus Foto</button>
         </div>
         <div class="form-group"><label for="ps-nama">Nama Karakter</label><input type="text" id="ps-nama" placeholder="nama character kamu" maxlength="100"></div>
+        <div class="form-group"><label for="ps-bio">Bio <span style="font-weight:400;color:var(--faint)">(tampil di forum)</span></label><textarea id="ps-bio" maxlength="300" placeholder="cerita singkat tentang karakter kamu..." style="min-height:74px"></textarea></div>
         <div class="error-msg" id="ps-error"></div>
         <div class="sub" id="ps-success" style="color:#22c55e;display:none;margin-bottom:8px">Profil berhasil diperbarui.</div>
         <div style="display:flex;gap:8px;justify-content:center">
@@ -325,7 +329,7 @@ function openProfileSettingsModal(user) {
       successEl.style.display = "none";
       const namaKarakter = document.getElementById("ps-nama").value.trim();
 
-      const body = { updateProfile: true, namaKarakter };
+      const body = { updateProfile: true, namaKarakter, bio: document.getElementById("ps-bio").value };
       const pending = modal.dataset.pendingAvatar;
       if (pending === "__remove__") body.avatar = null;
       else if (pending) body.avatar = pending;
@@ -348,6 +352,7 @@ function openProfileSettingsModal(user) {
   document.getElementById("ps-error").textContent = "";
   document.getElementById("ps-success").style.display = "none";
   document.getElementById("ps-nama").value = user.namaKarakter || "";
+  document.getElementById("ps-bio").value = user.bio || "";
   document.getElementById("ps-avatar-remove").style.display = user.avatar ? "inline-block" : "none";
   delete modal.dataset.pendingAvatar;
   const circle = document.getElementById("ps-avatar-circle");
@@ -426,4 +431,39 @@ async function requireAuth() {
     window.location.href = "index.html";
     return null;
   }
+}
+
+
+/* ====== Navbar & helper untuk WARGA (login Discord) ====== */
+const escW = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Label otomatis (High Command / Anggota PD / Warga / pangkat / role Discord).
+// Cuma tampilan — hak akses dicek server, bukan dari label.
+function renderLabels(labels, kecil) {
+  return (labels || []).map((l) =>
+    `<span class="lbl ${escW(l.tone)}${kecil ? " sm" : ""}"${l.dc ? ' title="Label otomatis dari role Discord"' : ""}>${l.tone === "hc" ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3 6.5 7 .9-5.2 4.8 1.4 7-6.2-3.5-6.2 3.5 1.4-7L2 9.4l7-.9z"/></svg>' : ""}${escW(l.teks)}${l.dc ? '<i class="dcdot"></i>' : ""}</span>`).join("");
+}
+function renderAvatarW(el, nama, url) {
+  if (url && String(url).startsWith("https://")) { el.style.backgroundImage = `url('${url}')`; el.textContent = ""; }
+  else { el.style.backgroundImage = ""; el.textContent = String(nama || "?").slice(0, 2).toUpperCase(); }
+}
+function renderWargaNavbar(active, w) {
+  const mount = document.getElementById("navbar-mount");
+  if (!mount) return;
+  const item = (href, label, key) => active === key ? `<span class="active">${label}</span>` : `<a href="${href}">${label}</a>`;
+  mount.innerHTML = `
+    <div class="navbar">
+      <div class="brand"><span class="flag">${LOGO_SVG}</span> kepolisian nexotis</div>
+      <nav id="nav-links" style="display:flex">${item("warga.html", "Beranda", "beranda")}${item("forum.html", "Forum", "forum")}${item("profil.html", "Profil Saya", "profil")}</nav>
+      <div class="user">
+        <div class="info"><div class="name">${escW(w.nama)}</div><div class="rank">${renderLabels(w.labels.slice(0, 1), true)}</div></div>
+        <div class="avatar" id="w-nav-avatar"></div>
+        <button class="btn btn-secondary" id="logout-btn" style="margin-left:6px;padding:7px 12px">Logout</button>
+      </div>
+    </div>`;
+  renderAvatarW(document.getElementById("w-nav-avatar"), w.nama, w.avatar);
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    try { await api("/api/auth-login?aksi=warga-logout", { method: "POST" }); } catch (e) { /* lanjut */ }
+    window.location.href = "index.html";
+  });
 }

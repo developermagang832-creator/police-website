@@ -41,6 +41,45 @@ Struktur tetap serverless (cocok Vercel):
    (opsional `DISCORD_REDIRECT_URI` kalau mau paksa URL redirect tertentu)
 4. Redeploy
 
+### Profil warga, label otomatis & sinkron Discord
+
+- **Beranda warga** (`warga.html`): profil + banner Discord, statistik, pengumuman
+  resmi, aktivitas forum, papan iklan, aksi cepat.
+- **Profil Saya** (`profil.html`): warga bisa ubah **bio** & **nama tampilan**
+  (atau ikut nama Discord). Foto profil, banner, nickname server & label
+  selalu ikut Discord. Tombol "Sinkronkan sekarang" = update dari Discord tanpa logout.
+  Bio Discord ("Tentang Saya") **tidak bisa ditarik** (Discord tidak memberi aksesnya
+  ke aplikasi lain), jadi bio diisi manual. Anggota (akun username/password)
+  isi bio lewat menu **Pengaturan Profil**.
+- **Label di forum otomatis** dan selalu dihitung ulang saat halaman dibuka:
+  - Akun anggota → **High Command** (kalau `isHighCommand`) atau **Anggota PD**, + pangkat.
+  - Warga Discord → **Warga**, atau label dari role server Discord (opsional, lihat di bawah).
+- **Label = tampilan saja, BUKAN hak akses.** Hak High Command di forum (sematkan,
+  kunci, pindah, hapus punya orang lain) hanya dari akun anggota dengan flag
+  High Command. Warga yang punya role HC di Discord dapat *label* HC, tapi tetap
+  tidak bisa moderasi. Kalau seorang HC punya sesi anggota + sesi Discord sekaligus,
+  sesi anggota yang dipakai (jadi hak HC-nya tidak hilang).
+- Nama tampilan warga tidak boleh mengandung "high command", "admin", "moderator",
+  "petinggi", "resmi", atau "HC" (cegah nyamar).
+
+#### Env var opsional: label dari role Discord
+Kalau tidak diisi, semua warga cuma berlabel **Warga** (semua fitur lain tetap jalan).
+Ambil ID lewat Discord: Pengaturan → Advanced → **Developer Mode** ON, lalu klik
+kanan server / role → **Copy ID**.
+
+| Env var | Isi |
+|---|---|
+| `DISCORD_GUILD_ID` | ID server Discord Kepolisian Nexotis |
+| `DISCORD_ROLE_HC` | ID role High Command (boleh banyak, pisah koma) |
+| `DISCORD_ROLE_ANGGOTA` | ID role Anggota PD (boleh banyak, pisah koma) |
+| `DISCORD_ROLE_LAIN` | label tambahan: `idRole=Label,idRole=Label` (mis. `123=VIP Warga`) |
+
+Begitu `DISCORD_GUILD_ID` diisi, login Discord ikut meminta izin **baca role di server**
+(`guilds.members.read`). Warga lama akan diminta menyetujui izin itu sekali lagi.
+Role disegarkan tiap login / klik "Sinkronkan sekarang" — kalau role dicabut di Discord,
+labelnya hilang setelah warga itu login/sinkron lagi. Tidak perlu bot & tidak ada
+endpoint baru di `/api` (masih 12 function).
+
 ## Alur pemakaian
 
 1. **Setup awal (SEKALI SAJA)** — buka `/setup.html`, isi `SETUP_SECRET`
