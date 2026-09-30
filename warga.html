@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kepolisian Nexotis - Beranda Warga</title>
+  <title>Kepolisian Nexotis - Home</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -67,7 +67,7 @@
   }
   function sapa() {
     const j = (new Date().getUTCHours() + 7) % 24; // WIB
-    return j < 4 ? "Selamat malam" : j < 11 ? "Selamat pagi" : j < 15 ? "Selamat siang" : j < 18 ? "Selamat sore" : "Selamat malam";
+    return j < 4 ? "GoodNight" : j < 11 ? "GoodMorning" : j < 15 ? "Good afternoon" : j < 18 ? "Good afternoon" : "GoodNight";
   }
 
   // ====== Popup Iklan ======
@@ -110,7 +110,7 @@
           <div class="hero-main">
             <div class="hero-name">${sapa()}, ${escW(w.nama)}</div>
             <div class="lbls">${renderLabels(w.labels)}</div>
-            <p class="hero-bio ${w.bio ? "" : "kosong"}">${w.bio ? escW(w.bio) : "Kamu belum nulis bio. Ceritain sedikit tentang dirimu biar warga lain kenal."}</p>
+            <p class="hero-bio ${w.bio ? "" : "kosong"}">${w.bio ? escW(w.bio) : "Kamu bisa menulis bio yah di website ini.."}</p>
             <div class="hero-meta">Bergabung ${tgl(w.pertamaLogin)} · Login terakhir ${rel(w.terakhirLogin)}${w.roleAktif && w.terakhirSinkron ? ` · Role Discord disinkron ${rel(w.terakhirSinkron)}` : ""}</div>
           </div>
           <div class="hero-act">
@@ -141,12 +141,12 @@
                 ${a.pin ? `<span class="chip">Disematkan</span> ` : ""}<span class="chip k">${rel(a.tanggal)}</span>
                 <a class="at" href="forum.html#/t/${escW(a.id)}">${escW(a.judul)}</a>
                 <p>${escW(a.cuplikan || "")}${(a.cuplikan || "").length >= 140 ? "…" : ""}</p>
-              </div>`).join("") : `<div class="kosong">Belum ada pengumuman dari High Command.</div>`}
+              </div>`).join("") : `<div class="kosong">Belum ada Announcement</div>`}
           </div>
 
           <div class="panel">
             <div class="panel-h"><span>Lagi Ramai di Forum</span><a href="forum.html">Buka forum ›</a></div>
-            ${d.aktivitas && d.aktivitas.length ? d.aktivitas.map(feed).join("") : `<div class="kosong">Forum masih sepi — jadi yang pertama bikin topik!</div>`}
+            ${d.aktivitas && d.aktivitas.length ? d.aktivitas.map(feed).join("") : `<div class="kosong">Belum ada orang yang mengisi forum ini, silahkan anda yang jadi pertama!!</div>`}
           </div>
         </div>
 
@@ -156,7 +156,7 @@
             <div class="quick">
               <a class="qa" href="forum.html#/k/saran"><span class="ico" data-k="saran">${svg("saran")}</span><span>Kasih Saran<small>ide buat kepolisian</small></span></a>
               <a class="qa" href="forum.html#/k/kritik"><span class="ico" data-k="kritik">${svg("kritik")}</span><span>Sampaikan Kritik<small>keluhan &amp; evaluasi</small></span></a>
-              <a class="qa" href="forum.html#/k/tanya"><span class="ico" data-k="tanya">${svg("tanya")}</span><span>Tanya Jawab<small>ada yang bingung?</small></span></a>
+              <a class="qa" href="forum.html#/k/tanya"><span class="ico" data-k="tanya">${svg("tanya")}</span><span>Tanya Jawab<small>Anda bingung cara kerja polisi?</small></span></a>
               <a class="qa" href="profil.html"><span class="ico">${svg("edit")}</span><span>Ubah Profil<small>nama &amp; bio</small></span></a>
             </div>
           </div>
