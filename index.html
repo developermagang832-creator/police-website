@@ -1,73 +1,129 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kepolisian Nexotis - Login</title>
-    <link rel="manifest" href="./manifest.json">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kepolsian Nexotis</title>
+  <style>
+:root {
+  --closed-ink: #16213e;
+  --closed-muted: #566074;
+  --closed-accent: #3a4fd7;
+  --closed-accent-dark: #2d3eb0;
+}
+
+.closed-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(10, 16, 36, 0.72);
+  backdrop-filter: blur(3px);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  animation: closed-fade 0.45s ease-out both;
+}
+
+.closed-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 2.5rem);
+  max-height: calc(100dvh - 2.5rem);
+  overflow-y: auto;
+  padding: 2rem 1.75rem;
+  background: #fff;
+  color: var(--closed-ink);
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  animation: closed-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.15) 0.15s both;
+}
+
+.closed-box h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.closed-box p {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--closed-muted);
+}
+
+.closed-text { text-align: left; }
+.closed-text p + p { margin-top: 0.85rem; }
+
+.closed-box .closed-date {
+  margin-top: 1rem;
+  font-weight: 600;
+  color: var(--closed-ink);
+}
+
+.closed-btn {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.8rem;
+  background: var(--closed-accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 999px;
+  transition: background-color 0.15s ease;
+}
+
+.closed-btn:hover { background: var(--closed-accent-dark); }
+
+@keyframes closed-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes closed-pop {
+  from { opacity: 0; transform: translateY(28px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .closed-overlay, .closed-box { animation: none; }
+}
+
+.closed-btn:focus-visible {
+  outline: 3px solid #f4b63f;
+  outline-offset: 3px;
+}
+  </style>
 </head>
 <body>
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="flag"><svg class="logo-svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M12 8.2l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z" fill="currentColor" stroke="none"/></svg></div>
-      <h1>KEPOLISIAN NEXOTIS</h1>
-      <p>Login akses ini hanya di akses oleh anggota saja, dan anggota bisa create nya di discord, terimakasih.</p>
-  
-      <div class="form-group" style="text-align:left">
-        <label for="username">Username</label>
-        <input type="text" id="username" placeholder="username kamu" autocomplete="username">
-      </div>
-      <div class="form-group" style="text-align:left">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="password kamu" autocomplete="current-password">
-      </div>
-      <button class="btn btn-primary" style="width:100%" id="login-btn">Masuk</button>
-      <div class="error-msg" id="error-msg"></div>
 
-      <div style="display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--faint);font-size:12px">
-        <div style="flex:1;height:1px;background:var(--border)"></div>Click button dibawah ini untuk civil mendaftar account<div style="flex:1;height:1px;background:var(--border)"></div>
+
+  <div class="closed-overlay" role="alertdialog" aria-modal="true"
+       aria-labelledby="closed-title" aria-describedby="closed-desc">
+    <div class="closed-box">
+      <h2 id="closed-title">Website ini sudah ditutup</h2>
+      <div id="closed-desc" class="closed-text">
+        <p>Halo guys, terima kasih banyak buat kalian semua yang sudah pakai dan mampir
+        ke website ini selama ini. Saya mau kasih kabar yang mungkin engak enak didengar:
+        website ini resmi saya tutup.</p>
+        <p>Alasan utamanya, saya sudah tidak lagi menjadi bagian dari kepolisian. Website
+        ini dulu saya buat khusus untuk kebutuhan di sana, jadi begitu saya sudah engga di
+        situ lagi, website ini otomatis kehilangan fungsi dan alasan buat dilanjutkan.</p>
+        <p>Alasan kedua soal biaya. Mungkin banyak yang mengira website ini jalan sendiri
+        dan gratis, padahal engga, guys. Tiap bulan saya harus bayar sendiri sekitar
+        Rp50.000 sampai Rp 150.000 an hanya untuk langganan hosting dan database Upstash. Kalau
+        website ini masih aktif dan terpakai, mungkin masih masuk akal. Tapi dengan kondisi
+        sekarang, terus bayar tiap bulan untuk sesuatu yang sudah engga dipakai rasanya
+        enggak masuk akal.</p>
+        <p>Sekali lagi terima kasih atas dukungan dan pengertian kalian semua. Kalau masih
+        ada yang mau ditanyakan, silakan hubungi saya lewat tombol di bawah ini ya.</p>
       </div>
-      <a class="btn" href="/api/auth-login?aksi=discord" style="display:block;box-sizing:border-box;width:100%;text-align:center;text-decoration:none;background:#5865F2;color:#fff">Login dengan Discord</a>
-      <div class="foot">© 2026 Kepolisian Nexotis</div>
+      <p class="closed-date">Ditutup pada <time datetime="2026-10-5">5 Oktober 2026</time></p>
+      <a class="closed-btn" href="mailto:solehmuhamad6777@gmail.com">Hubungi kami</a>
     </div>
   </div>
 
-<script src="app.js"></script>
-<script>
-  // Kalau sesi masih aktif, langsung ke dashboard
-  (async () => {
-    try { await api("/api/me"); window.location.href = "dashboard.html"; return; }
-    catch (e) { /* bukan anggota */ }
-    try { await api("/api/auth-login?aksi=warga-me"); window.location.href = "warga.html"; }
-    catch (e) { /* belum login, tetap di sini */ }
-  })();
-
-  // Pesan error dari alur login Discord (?err=...)
-  const errQuery = new URLSearchParams(location.search).get("err");
-  if (errQuery) document.getElementById("error-msg").textContent = errQuery;
-
-  document.getElementById("login-btn").addEventListener("click", doLogin);
-  document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-
-  async function doLogin() {
-    const errorEl = document.getElementById("error-msg");
-    errorEl.textContent = "";
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value;
-    if (!username || !password) { errorEl.textContent = "Username & password wajib diisi."; return; }
-
-    const btn = document.getElementById("login-btn");
-    btn.disabled = true; btn.textContent = "Memeriksa...";
-    try {
-      await api("/api/auth-login", { method: "POST", body: JSON.stringify({ username, password }) });
-      window.location.href = "dashboard.html";
-    } catch (e) {
-      errorEl.textContent = e.message;
-    } finally {
-      btn.disabled = false; btn.textContent = "Masuk";
-    }
-  }
-</script>
 </body>
 </html>
