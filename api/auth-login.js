@@ -3,7 +3,7 @@ const kvStore = require("../lib/kv");
 const session = require("../lib/session");
 const { hashPassword, verifyPassword } = require("../lib/password");
 const { setSessionCookie, sanitizeUser } = require("../lib/auth");
-const { PANGKAT_LIST } = require("../lib/pangkat");
+const { PANGKAT_LIST, PANGKAT_AUTO_HC } = require("../lib/pangkat");
 const { jakartaTodayISO } = require("../lib/waktu");
 const { notifyPendaftaranBaru } = require("../lib/discord");
 const { kirimDetailAkun } = require("../lib/mailer");
@@ -43,6 +43,7 @@ async function daftar(req, res, b) {
   const password = String(b.password || "");
   const namaKarakter = String(b.namaKarakter || "").trim().slice(0, 100);
   const pangkat = String(b.pangkat || "");
+  const langsungHC = PANGKAT_AUTO_HC.includes(pangkat);
 
   if (!username || !password || !email) return res.status(400).json({ error: "Username, email & password wajib diisi." });
   if (!USERNAME_RE.test(username)) return res.status(400).json({ error: "Username 3-32 karakter, cuma boleh huruf, angka, titik, strip, dan underscore." });
@@ -50,6 +51,12 @@ async function daftar(req, res, b) {
   if (password.length < 6) return res.status(400).json({ error: "Password minimal 6 karakter." });
   if (!namaKarakter) return res.status(400).json({ error: "Nama karakter wajib diisi." });
   if (!PANGKAT_LIST.includes(pangkat)) return res.status(400).json({ error: "Pangkat nggak valid." });
+
+  // Pangkat auto-HC nggak lewat approval, jadi kalau KODE_PANGKAT_TINGGI diisi di
+  // Environment Variables, pendaftar wajib tahu kodenya (opsional, biar nggak sembarang orang jadi HC).
+  if (langsungHC && process.env.KODE_PANGKAT_TINGGI && String(b.kode || "") !== process.env.KODE_PANGKAT_TINGGI) {
+    return res.status(403).json({ error: "Kode akses untuk pangkat ini salah." });
+  }
 
   const users = await kvStore.getUsers();
   if (users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: "Username sudah dipakai." });
@@ -61,16 +68,22 @@ async function daftar(req, res, b) {
     email,
     passwordHash: hashPassword(password),
     namaKarakter,
-    pangkat, // pangkat yang DIAJUKAN; baru berlaku kalau di-approve High Command
-    isHighCommand: false,
+    pangkat, // pangkat biasa = pangkat yang DIAJUKAN, baru berlaku setelah di-approve High Command
+    isHighCommand: langsungHC, // pangkat paling atas: langsung High Command
     avatar: null,
-    status: "pending",
+    status: langsungHC ? "approved" : "pending", // pangkat paling atas: tanpa approval
     bergabung: jakartaTodayISO(),
   };
   users.push(baru);
   await kvStore.setUsers(users);
 
   // Kabari High Command (Discord + lonceng website). Gagal kirim nggak boleh bikin daftar gagal.
+  if (langsungHC) {
+    try {
+      await notif.kirimKeHC({ tipe: "peringatan", judul: "Akun High Command baru", isi: `${namaKarakter} (${username}) daftar sebagai ${pangkat} dan langsung aktif tanpa approval.`, href: "rekap.html?tab=users" });
+    } catch (e) { console.error("[daftar] notif website:", e.message); }
+    return res.json({ ok: true, langsung: true });
+  }
   try { await notifyPendaftaranBaru(baru); } catch (e) { console.error("[daftar] notif discord:", e.message); }
   try {
     await notif.kirimKeHC({ tipe: "info", judul: "Pendaftaran akun baru", isi: `${namaKarakter} (${username}) daftar sebagai ${pangkat}.`, href: "rekap.html?tab=pendaftaran" });

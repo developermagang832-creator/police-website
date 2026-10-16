@@ -462,10 +462,7 @@
     tbody.innerHTML = pending.length
       ? pending.map((u) => {
           const aman = u.username.replace(/'/g, "\\'");
-          const terkunci = pangkatTanpaRekap(u.pangkat);
-          const tombolSetuju = terkunci
-            ? `<span style="font-size:11px;color:#b45309;align-self:center" title="Pangkat tertinggi nggak bisa di-approve lewat Panel Rekap">Diproses manual</span>`
-            : `<button class="btn btn-primary" style="padding:5px 10px;font-size:11px" onclick="setujuPendaftaran('${u.id}','${aman}')">Setujui</button>`;
+          const tombolSetuju = `<button class="btn btn-primary" style="padding:5px 10px;font-size:11px" onclick="setujuPendaftaran('${u.id}','${aman}')">Setujui</button>`;
           return `
         <tr>
           <td>${u.username}</td>

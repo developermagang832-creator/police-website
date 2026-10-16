@@ -38,10 +38,10 @@ const PANGKAT_LIST = [
   "PO I",
   "Prob. Police Officer",
 ];
-// Pangkat yang TIDAK bisa di-approve lewat Panel Rekap (harus diproses manual).
+// Pangkat yang langsung aktif + otomatis High Command saat daftar (tanpa approval).
 // Harus sama dengan lib/pangkat.js di server.
-const PANGKAT_TANPA_REKAP = [PANGKAT_LIST[0]];
-function pangkatTanpaRekap(pangkat) { return PANGKAT_TANPA_REKAP.includes(pangkat); }
+const PANGKAT_AUTO_HC = [PANGKAT_LIST[0]];
+function pangkatAutoHC(pangkat) { return PANGKAT_AUTO_HC.includes(pangkat); }
 const HIGH_COMMAND_CUTOFF_INDEX = PANGKAT_LIST.indexOf("Commander");
 function isPangkatHighCommand(pangkat) {
   const idx = PANGKAT_LIST.indexOf(pangkat);
@@ -825,3 +825,14 @@ function initNotif(user) {
   function mulai() { mo.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style"] }); pindai(document.body); }
   if (document.body) mulai(); else document.addEventListener("DOMContentLoaded", mulai);
 })();
+
+
+// Tombol lihat/sembunyikan password di form login/daftar/reset (class .eye di dalam .field).
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest(".eye");
+  if (!b) return;
+  const inp = b.parentElement.querySelector("input");
+  if (!inp) return;
+  inp.type = inp.type === "password" ? "text" : "password";
+  b.classList.toggle("on", inp.type === "text");
+});
