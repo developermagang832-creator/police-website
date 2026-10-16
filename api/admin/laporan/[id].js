@@ -1,6 +1,7 @@
 const kvStore = require("../../../lib/kv");
 const { getUserFromReq } = require("../../../lib/auth");
 const { notifyStatusDiproses } = require("../../../lib/discord");
+const notif = require("../../../lib/notif");
 
 module.exports = async (req, res) => {
   const hc = await getUserFromReq(req);
@@ -27,6 +28,12 @@ module.exports = async (req, res) => {
   if (pemilik) {
     await notifyStatusDiproses(pemilik, hc, rec);
   }
+
+  // Notifikasi di website buat pemilik laporan (lonceng + toast).
+  const namaHC = hc.namaKarakter || hc.username;
+  await notif.kirim(rec.userId, status === "diterima"
+    ? { tipe: "sukses", judul: "Laporan diterima", isi: `Laporan ${rec.tipe} tanggal ${rec.tanggal} disetujui ${namaHC}.`, href: "dashboard.html" }
+    : { tipe: "bahaya", judul: "Laporan ditolak", isi: `Laporan ${rec.tipe} tanggal ${rec.tanggal} ditolak ${namaHC}${alasan ? ": " + String(alasan).slice(0, 120) : "."}`, href: "dashboard.html" });
 
   res.json({ ok: true });
 };

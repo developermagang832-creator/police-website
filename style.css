@@ -677,10 +677,8 @@ textarea { resize: vertical; min-height: 60px; }
 .lbl.sm { font-size: 10px; padding: 1px 7px; }
 .lbl.hc { background: linear-gradient(135deg, #b4802c, #c8963e); color: #fff; box-shadow: 0 2px 6px rgba(200, 150, 62, .35); }
 .lbl.anggota { background: #e3eeff; color: #2563eb; }
-.lbl.warga { background: #eceff5; color: #55627c; }
 .lbl.pangkat { background: #fff; color: var(--muted); border: 1px solid var(--border); }
 .lbl.custom { background: #efe7ff; color: #7c3aed; }
-.lbl .dcdot { width: 6px; height: 6px; border-radius: 50%; background: #5865F2; display: inline-block; }
 .lbls { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
 
 /* ====== Avatar bulat serbaguna ====== */
@@ -829,12 +827,6 @@ textarea { resize: vertical; min-height: 60px; }
   #nav-links a, #nav-links span.active { padding: 6px 9px; font-size: 12px; }
 }
 
-/* Warna ikon per kategori forum (biar nggak monoton pink semua) */
-.ico[data-k="pengumuman"] { background: rgba(255,92,138,.16); color: #e11d5c; }
-.ico[data-k="saran"] { background: rgba(251,191,36,.2); color: #d97706; }
-.ico[data-k="kritik"] { background: rgba(96,165,250,.2); color: #2563eb; }
-.ico[data-k="tanya"] { background: rgba(52,211,153,.2); color: #059669; }
-.ico[data-k="umum"] { background: rgba(167,139,250,.22); color: #7c3aed; }
 
 
 /* ============================================================

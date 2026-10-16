@@ -76,7 +76,7 @@
       <div class="sub" style="margin-bottom:10px">Akun yang baru daftar sendiri (belum di-approve) muncul di sini.</div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Username</th><th>Nama Karakter</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Username</th><th>Nama Karakter</th><th>Pangkat Diajukan</th><th>Aksi</th></tr></thead>
           <tbody id="pendaftaran-body"></tbody>
         </table>
       </div>
@@ -460,16 +460,24 @@
     const tbody = document.getElementById("pendaftaran-body");
     const pending = (allUsers || []).filter((u) => u.status === "pending");
     tbody.innerHTML = pending.length
-      ? pending.map((u) => `
+      ? pending.map((u) => {
+          const aman = u.username.replace(/'/g, "\\'");
+          const terkunci = pangkatTanpaRekap(u.pangkat);
+          const tombolSetuju = terkunci
+            ? `<span style="font-size:11px;color:#b45309;align-self:center" title="Pangkat tertinggi nggak bisa di-approve lewat Panel Rekap">Diproses manual</span>`
+            : `<button class="btn btn-primary" style="padding:5px 10px;font-size:11px" onclick="setujuPendaftaran('${u.id}','${aman}')">Setujui</button>`;
+          return `
         <tr>
           <td>${u.username}</td>
           <td>${u.namaKarakter || "-"}</td>
+          <td>${u.pangkat || "-"}</td>
           <td style="display:flex;gap:6px">
-            <button class="btn btn-primary" style="padding:5px 10px;font-size:11px" onclick="setujuPendaftaran('${u.id}','${u.username.replace(/'/g, "\\'")}')">Setujui</button>
-            <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px" onclick="tolakPendaftaran('${u.id}','${u.username.replace(/'/g, "\\'")}')">Tolak</button>
+            ${tombolSetuju}
+            <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px" onclick="tolakPendaftaran('${u.id}','${aman}')">Tolak</button>
           </td>
-        </tr>`).join("")
-      : `<tr><td colspan="3" class="empty">Tidak ada pendaftaran menunggu approval.</td></tr>`;
+        </tr>`;
+        }).join("")
+      : `<tr><td colspan="4" class="empty">Tidak ada pendaftaran menunggu approval.</td></tr>`;
   }
 
   async function setujuPendaftaran(id, username) {

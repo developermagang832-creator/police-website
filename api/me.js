@@ -13,6 +13,7 @@ const {
 const { hitungRankDuty, JAM_RANK_PERTAMA, TAMBAHAN_JAM_PER_RANK } = require("../lib/rankduty");
 const { notifyKlaimGaji, notifyPengajuanPromosi } = require("../lib/discord");
 const { jakartaTodayISO } = require("../lib/waktu");
+const notif = require("../lib/notif");
 
 // Batas ukuran avatar (data URL base64). Avatar dikompres dulu di browser
 // (compressAvatarFile di app.js) sebelum dikirim, jadi normalnya jauh di
@@ -130,8 +131,20 @@ module.exports = async (req, res) => {
     });
   }
 
+  // ====== Aksi: notifikasi (lonceng di navbar) ======
+  // Numpang di /api/me juga (limit 12 function Vercel Hobby).
+  //   GET  /api/me?view=notif            -> { notif: [...], unread }
+  //   POST /api/me {notifBaca: "all"|id} -> tandai sudah dibaca
+  if (req.method === "GET" && req.query && req.query.view === "notif") {
+    return res.json(await notif.daftar(user.id));
+  }
+  if (req.method === "POST" && req.body && req.body.notifBaca) {
+    await notif.tandaiBaca(user.id, String(req.body.notifBaca));
+    return res.json({ ok: true });
+  }
+
   if (req.method === "POST") {
-    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar, bio, ajukanPromosi } = req.body || {};
+    const { klaimGaji: mauKlaim, updateProfile, namaKarakter, avatar, ajukanPromosi } = req.body || {};
 
     // ====== Aksi: ajukan Kenaikan Pangkat ======
     // Cuma bisa diajukan kalau target minggu ini (5x arrest + 30 jam duty
@@ -181,7 +194,7 @@ module.exports = async (req, res) => {
       return res.json({ ok: true, request });
     }
 
-    // ====== Aksi: update profil sendiri (nama karakter, bio & foto profil) ======
+    // ====== Aksi: update profil sendiri (nama karakter & foto profil) ======
     if (updateProfile) {
       const users = await kvStore.getUsers();
       const target = users.find((u) => u.id === user.id);
@@ -189,9 +202,6 @@ module.exports = async (req, res) => {
 
       if (namaKarakter !== undefined) {
         target.namaKarakter = String(namaKarakter).trim().slice(0, 100);
-      }
-      if (bio !== undefined) {
-        target.bio = String(bio).replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 300);
       }
       if (avatar !== undefined) {
         if (avatar === null) {

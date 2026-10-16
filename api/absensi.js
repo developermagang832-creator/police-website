@@ -4,6 +4,7 @@ const { getUserFromReq } = require("../lib/auth");
 const { notifyLaporanMasuk } = require("../lib/discord");
 const { uploadFotoKeCloudinary } = require("../lib/cloudinary");
 const { jakartaTodayISO } = require("../lib/waktu");
+const notif = require("../lib/notif");
 
 module.exports = async (req, res) => {
   const user = await getUserFromReq(req);
@@ -79,6 +80,10 @@ module.exports = async (req, res) => {
     await kvStore.setAbsensi(absensiAll);
 
     await notifyLaporanMasuk(user, record);
+    await notif.kirimKeHC(
+      { tipe: "info", judul: "Laporan baru menunggu", isi: `${user.namaKarakter || user.username} mengirim laporan ${tipe} untuk ${record.tanggal}.`, href: "rekap.html" },
+      user.id
+    );
     return res.json({ ok: true, record });
   }
 

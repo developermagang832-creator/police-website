@@ -1,6 +1,7 @@
 const kvStore = require("../../lib/kv");
 const { getUserFromReq } = require("../../lib/auth");
 const { jakartaTodayISO } = require("../../lib/waktu");
+const notif = require("../../lib/notif");
 
 module.exports = async (req, res) => {
   const user = await getUserFromReq(req);
@@ -20,6 +21,11 @@ module.exports = async (req, res) => {
   // kalender, cuma berubah kalau High Command klik tombol ini.
   const periodeBaru = jakartaTodayISO();
   await kvStore.setPeriodeMulai(periodeBaru);
+
+  await notif.kirimKeSemua(
+    { tipe: "peringatan", judul: "Periode duty direset", isi: `${user.namaKarakter || user.username} mereset semua data duty. Hitungan dimulai lagi dari ${periodeBaru}.`, href: "dashboard.html" },
+    user.id
+  );
 
   res.json({ ok: true, resetCount, periodeMulai: periodeBaru });
 };

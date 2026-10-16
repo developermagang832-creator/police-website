@@ -38,6 +38,10 @@ const PANGKAT_LIST = [
   "PO I",
   "Prob. Police Officer",
 ];
+// Pangkat yang TIDAK bisa di-approve lewat Panel Rekap (harus diproses manual).
+// Harus sama dengan lib/pangkat.js di server.
+const PANGKAT_TANPA_REKAP = [PANGKAT_LIST[0]];
+function pangkatTanpaRekap(pangkat) { return PANGKAT_TANPA_REKAP.includes(pangkat); }
 const HIGH_COMMAND_CUTOFF_INDEX = PANGKAT_LIST.indexOf("Commander");
 function isPangkatHighCommand(pangkat) {
   const idx = PANGKAT_LIST.indexOf(pangkat);
@@ -144,7 +148,6 @@ function renderNavbar(activePage, user) {
     ["undang-undang.html", "Undang-Undang", "undang-undang"],
     ["arrest-record.html", "Arrest Record", "arrest-record"],
     ["struktur.html", "Struktur Anggota", "struktur"],
-    ["forum.html", "Kritik & Saran", "forum"],
   ];
   const navLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
   const navMenuLinksHtml = navItems.map(([href, label, page]) => linkOrSpan(href, label, page)).join("");
@@ -291,7 +294,6 @@ function openProfileSettingsModal(user) {
           <button type="button" class="btn-link" id="ps-avatar-remove" style="display:none">Hapus Foto</button>
         </div>
         <div class="form-group"><label for="ps-nama">Nama Karakter</label><input type="text" id="ps-nama" placeholder="nama character kamu" maxlength="100"></div>
-        <div class="form-group"><label for="ps-bio">Bio <span style="font-weight:400;color:var(--faint)">(tampil di forum)</span></label><textarea id="ps-bio" maxlength="300" placeholder="cerita singkat tentang karakter kamu..." style="min-height:74px"></textarea></div>
         <div class="error-msg" id="ps-error"></div>
         <div class="sub" id="ps-success" style="color:#22c55e;display:none;margin-bottom:8px">Profil berhasil diperbarui.</div>
         <div style="display:flex;gap:8px;justify-content:center">
@@ -337,7 +339,7 @@ function openProfileSettingsModal(user) {
       successEl.style.display = "none";
       const namaKarakter = document.getElementById("ps-nama").value.trim();
 
-      const body = { updateProfile: true, namaKarakter, bio: document.getElementById("ps-bio").value };
+      const body = { updateProfile: true, namaKarakter };
       const pending = modal.dataset.pendingAvatar;
       if (pending === "__remove__") body.avatar = null;
       else if (pending) body.avatar = pending;
@@ -360,7 +362,6 @@ function openProfileSettingsModal(user) {
   document.getElementById("ps-error").textContent = "";
   document.getElementById("ps-success").style.display = "none";
   document.getElementById("ps-nama").value = user.namaKarakter || "";
-  document.getElementById("ps-bio").value = user.bio || "";
   document.getElementById("ps-avatar-remove").style.display = user.avatar ? "inline-block" : "none";
   delete modal.dataset.pendingAvatar;
   const circle = document.getElementById("ps-avatar-circle");
@@ -441,40 +442,6 @@ async function requireAuth() {
   }
 }
 
-
-/* ====== Navbar & helper untuk WARGA (login Discord) ====== */
-const escW = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-// Label otomatis (High Command / Anggota PD / Warga / pangkat / role Discord).
-// Cuma tampilan — hak akses dicek server, bukan dari label.
-function renderLabels(labels, kecil) {
-  return (labels || []).map((l) =>
-    `<span class="lbl ${escW(l.tone)}${kecil ? " sm" : ""}"${l.dc ? ' title="Label otomatis dari role Discord"' : ""}>${l.tone === "hc" ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3 6.5 7 .9-5.2 4.8 1.4 7-6.2-3.5-6.2 3.5 1.4-7L2 9.4l7-.9z"/></svg>' : ""}${escW(l.teks)}${l.dc ? '<i class="dcdot"></i>' : ""}</span>`).join("");
-}
-function renderAvatarW(el, nama, url) {
-  if (url && String(url).startsWith("https://")) { el.style.backgroundImage = `url('${url}')`; el.textContent = ""; }
-  else { el.style.backgroundImage = ""; el.textContent = String(nama || "?").slice(0, 2).toUpperCase(); }
-}
-function renderWargaNavbar(active, w) {
-  const mount = document.getElementById("navbar-mount");
-  if (!mount) return;
-  const item = (href, label, key) => active === key ? `<span class="active">${label}</span>` : `<a href="${href}">${label}</a>`;
-  mount.innerHTML = `
-    <div class="navbar">
-      <div class="brand"><span class="flag">${LOGO_SVG}</span> kepolisian nexotis</div>
-      <nav id="nav-links" style="display:flex">${item("warga.html", "Beranda", "beranda")}${item("forum.html", "Forum", "forum")}${item("profil.html", "Profil Saya", "profil")}</nav>
-      <div class="user">
-        <div class="info"><div class="name">${escW(w.nama)}</div><div class="rank">${renderLabels(w.labels.slice(0, 1), true)}</div></div>
-        <div class="avatar" id="w-nav-avatar"></div>
-        <button class="btn btn-secondary" id="logout-btn" style="margin-left:6px;padding:7px 12px">Logout</button>
-      </div>
-    </div>`;
-  renderAvatarW(document.getElementById("w-nav-avatar"), w.nama, w.avatar);
-  document.getElementById("logout-btn").addEventListener("click", async () => {
-    try { await api("/api/auth-login?aksi=warga-logout", { method: "POST" }); } catch (e) { /* lanjut */ }
-    window.location.href = "index.html";
-  });
-}
 
 /* ============================================================
    Modal & toast notifikasi (gaya SweetAlert) — menggantikan alert()

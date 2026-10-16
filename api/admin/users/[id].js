@@ -1,6 +1,7 @@
 const kvStore = require("../../../lib/kv");
 const { getUserFromReq, sanitizeUser } = require("../../../lib/auth");
 const { hashPassword } = require("../../../lib/password");
+const { PANGKAT_TANPA_REKAP } = require("../../../lib/pangkat");
 
 module.exports = async (req, res) => {
   try {
@@ -21,6 +22,10 @@ module.exports = async (req, res) => {
       if (status !== undefined) {
         if (!["approved", "pending", "ditolak"].includes(status)) {
           return res.status(400).json({ error: "Status tidak valid." });
+        }
+        // Pangkat tertinggi nggak boleh di-approve lewat Panel Rekap (harus manual).
+        if (status === "approved" && target.status !== "approved" && PANGKAT_TANPA_REKAP.includes(target.pangkat)) {
+          return res.status(403).json({ error: `Pendaftar dengan pangkat "${target.pangkat}" nggak bisa di-approve lewat Panel Rekap.` });
         }
         target.status = status;
         await kvStore.setUsers(users);

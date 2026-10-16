@@ -7,6 +7,7 @@
 const crypto = require("crypto");
 const kvStore = require("../lib/kv");
 const { getUserFromReq } = require("../lib/auth");
+const notif = require("../lib/notif");
 
 const MAX_ARRESTS_DISIMPAN = 500; // biar Redis nggak bengkak nggak terbatas
 
@@ -32,7 +33,7 @@ async function kirimKeDiscord(arrest, fotoKtp) {
 
   const payload = {
     username: "Arrest Record",
-    embeds: [{ title: "🚔 Arrest Record Baru", color: 0xff7aa2, fields, footer: { text: `ID Perkara: ${arrest.id}` }, timestamp: arrest.tanggal }],
+    embeds: [{ title: "🚔 Arrest Record Baru", color: 0x2457d6, fields, footer: { text: `ID Perkara: ${arrest.id}` }, timestamp: arrest.tanggal }],
   };
 
   try {
@@ -113,6 +114,10 @@ module.exports = async (req, res) => {
     }
 
     await kirimKeDiscord(arrest, arrest.fotoKtp);
+    await notif.kirimKeHC(
+      { tipe: "info", judul: "Arrest record baru", isi: `${arrest.namaPetugas} menahan ${arrest.namaTersangka}${arrest.lokasi ? " di " + arrest.lokasi : ""}.`, href: "arrest-record.html" },
+      user.id
+    );
     return res.json({ ok: true, arrest });
   }
 
