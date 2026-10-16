@@ -33,7 +33,7 @@
 
     <div class="card" id="panel-rekap">
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-        <button class="btn btn-secondary" id="rekap-pdf-btn">📄 Download PDF</button>
+        <button class="btn btn-secondary" id="rekap-pdf-btn">Download PDF</button>
       </div>
       <div style="overflow-x:auto">
         <table>
@@ -110,7 +110,7 @@
         <h2>Daftar Anggota</h2>
         <div class="bulk-actions">
           <div class="sub" id="bulk-count-label">Belum ada yang dipilih.</div>
-          <button class="btn btn-secondary" id="bulk-delete-btn" style="background:#7c2d12;color:#fed7aa" disabled>🗑️ Hapus Terpilih</button>
+          <button class="btn btn-secondary" id="bulk-delete-btn" style="background:#7c2d12;color:#fed7aa" disabled>Hapus Terpilih</button>
         </div>
         <div style="overflow-x:auto">
           <table>
@@ -134,7 +134,6 @@
         <div class="form-group">
           <label>Foto Iklan (opsional)</label>
           <div id="iklan-dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s ease,background .2s ease;">
-            <div style="font-size:24px;margin-bottom:6px">🖼️</div>
             <div style="font-size:12px;color:var(--muted)">Tarik &amp; lepas foto di sini, atau klik untuk pilih 1 foto</div>
             <input type="file" id="iklan-foto" accept="image/*" style="display:none">
           </div>
@@ -210,7 +209,6 @@
 
   <div class="modal-overlay" id="confirm-modal">
     <div class="modal-box">
-      <div style="font-size:28px;margin-bottom:8px">⚠️</div>
       <div style="font-weight:700;margin-bottom:6px">Reset semua duty?</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
         Ini akan menghapus SELURUH riwayat absensi semua anggota (hadir/izin/cuti) tanpa bisa dibatalkan.
@@ -225,7 +223,6 @@
 
   <div class="modal-overlay" id="confirm-gaji-modal">
     <div class="modal-box">
-      <div style="font-size:28px;margin-bottom:8px">⚠️</div>
       <div style="font-weight:700;margin-bottom:6px">Reset gaji semua anggota?</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
         Semua anggota bisa klaim gaji lagi mulai sekarang, walau minggu ini udah pernah klaim.
@@ -326,7 +323,7 @@
   // Export tabel Rekap Anggota (jam kerja + hadir/izin/cuti/alpa) jadi file PDF,
   // pakai jsPDF + autoTable yang di-load lewat CDN di <head>.
   function downloadRekapPdf() {
-    if (!window.jspdf) { alert("Modul PDF belum siap dimuat, coba lagi sebentar."); return; }
+    if (!window.jspdf) { notify.warning("Belum siap", "Modul PDF belum selesai dimuat, coba lagi sebentar."); return; }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const tanggalCetak = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
@@ -408,7 +405,7 @@
       await api(`/api/admin/laporan/${id}`, { method: "POST", body: JSON.stringify({ status: "ditolak", alasan }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
@@ -439,12 +436,12 @@
   async function terimaPromosi(id) {
     const p = allPromosi.find((x) => x.id === id);
     const u = p && allUsers.find((x) => x.id === p.userId);
-    if (!confirm(`Terima kenaikan pangkat ${u ? (u.namaKarakter || u.username) : "anggota ini"} ke "${p ? p.pangkatTarget : "-"}"?`)) return;
+    if (!(await notify.confirm("Terima kenaikan pangkat?", `${u ? (u.namaKarakter || u.username) : "Anggota ini"} akan naik ke "${p ? p.pangkatTarget : "-"}".`, { ok: "Terima" }))) return;
     try {
       await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ prosesPromosi: { id, status: "diterima" } }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
@@ -455,7 +452,7 @@
       await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ prosesPromosi: { id, status: "ditolak", alasan } }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
@@ -476,22 +473,22 @@
   }
 
   async function setujuPendaftaran(id, username) {
-    if (!confirm(`Setujui pendaftaran ${username}?`)) return;
+    if (!(await notify.confirm("Setujui pendaftaran?", `Akun ${username} akan bisa login.`, { ok: "Setujui" }))) return;
     try {
       await api(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ status: "approved" }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
   async function tolakPendaftaran(id, username) {
-    if (!confirm(`Tolak pendaftaran ${username}? Akunnya nggak akan bisa login.`)) return;
+    if (!(await notify.confirm("Tolak pendaftaran?", `Akun ${username} tidak akan bisa login.`, { ok: "Tolak", danger: true }))) return;
     try {
       await api(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify({ status: "ditolak" }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
@@ -549,7 +546,7 @@
     const ids = Array.from(selectedUserIds);
     if (!ids.length) return;
     const names = ids.map((id) => allUsers.find((u) => u.id === id)?.username).filter(Boolean);
-    if (!confirm(`Hapus ${ids.length} anggota terpilih (${names.join(", ")})? Aksi ini tidak bisa dibatalkan.`)) return;
+    if (!(await notify.confirm(`Hapus ${ids.length} anggota?`, `${names.join(", ")}\n\nAksi ini tidak bisa dibatalkan.`, { ok: "Hapus", danger: true }))) return;
 
     const btn = document.getElementById("bulk-delete-btn");
     btn.disabled = true; btn.textContent = "Menghapus...";
@@ -560,9 +557,9 @@
       selectedUserIds.clear();
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     } finally {
-      btn.textContent = "🗑️ Hapus Terpilih";
+      btn.textContent = "Hapus Terpilih";
       updateBulkUI();
     }
   });
@@ -633,12 +630,12 @@
   });
 
   async function deleteUser(id, username) {
-    if (!confirm(`Hapus anggota "${username}"? Aksi ini tidak bisa dibatalkan.`)) return;
+    if (!(await notify.confirm("Hapus anggota?", `Anggota "${username}" akan dihapus. Aksi ini tidak bisa dibatalkan.`, { ok: "Hapus", danger: true }))) return;
     try {
       await api(`/api/admin/users/${id}`, { method: "DELETE" });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
@@ -669,7 +666,7 @@
     wrap.style.display = "block";
     wrap.innerHTML = `
       <img src="${currentFotoList[i]}" style="max-width:100%;max-height:65vh;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;cursor:zoom-out" onclick="renderFotoGallery()">
-      <div style="margin-bottom:10px"><button class="btn btn-secondary" onclick="renderFotoGallery()">🔍 Zoom Out</button></div>`;
+      <div style="margin-bottom:10px"><button class="btn btn-secondary" onclick="renderFotoGallery()">Zoom Out</button></div>`;
   }
   document.getElementById("modal-close").addEventListener("click", () => document.getElementById("foto-modal").classList.remove("open"));
 
@@ -683,7 +680,7 @@
       document.getElementById("confirm-modal").classList.remove("open");
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     } finally {
       btn.disabled = false; btn.textContent = "Ya, Reset";
     }
@@ -698,7 +695,7 @@
       await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ resetGaji: true }) });
       document.getElementById("confirm-gaji-modal").classList.remove("open");
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     } finally {
       btn.disabled = false; btn.textContent = "Ya, Reset";
     }
@@ -815,12 +812,12 @@
   }
 
   async function hapusIklan(id) {
-    if (!confirm("Hapus iklan ini?")) return;
+    if (!(await notify.confirm("Hapus iklan ini?", "", { ok: "Hapus", danger: true }))) return;
     try {
       await api("/api/admin/rekap", { method: "POST", body: JSON.stringify({ hapusIklan: id }) });
       await refreshAll();
     } catch (e) {
-      alert(e.message);
+      notify.error("Gagal", e.message);
     }
   }
 
