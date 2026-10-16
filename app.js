@@ -834,5 +834,5 @@ document.addEventListener("click", (e) => {
   const inp = b.parentElement.querySelector("input");
   if (!inp) return;
   inp.type = inp.type === "password" ? "text" : "password";
-  b.classList.toggle("on", inp.type === "text");
+  b.textContent = inp.type === "password" ? "Lihat" : "Sembunyi";
 });

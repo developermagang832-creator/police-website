@@ -6,18 +6,20 @@ const { setSessionCookie, sanitizeUser } = require("../lib/auth");
 const { PANGKAT_LIST, PANGKAT_AUTO_HC } = require("../lib/pangkat");
 const { jakartaTodayISO } = require("../lib/waktu");
 const { notifyPendaftaranBaru } = require("../lib/discord");
-const { kirimDetailAkun } = require("../lib/mailer");
+const { kirimDetailAkun, kirimKodeVerifikasi } = require("../lib/mailer");
 const notif = require("../lib/notif");
 
 const SESSION_TTL_SEC = 12 * 60 * 60;
 const RESET_TTL_MENIT = 30;
+const KODE_TTL_MENIT = 10;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_RE = /^[A-Za-z0-9_.-]{3,32}$/;
 
 // Satu endpoint ini dipakai buat 4 hal (limit 12 function Vercel Hobby):
 //   POST { username, password }                          -> login
+//   POST { kirimKode: true, username, email }            -> kirim kode verifikasi 6 digit ke email
 //   POST { daftar: true, username, email, password,
-//          namaKarakter, pangkat }                       -> daftar akun baru (pending)
+//          namaKarakter, pangkat, verifToken, kodeEmail } -> daftar akun baru (wajib kode email benar)
 //   POST { lupa: true, email }                           -> kirim detail akun + link reset ke email
 //   POST { reset: true, token, password }                -> set password baru dari link email
 
@@ -31,6 +33,35 @@ function sidikPassword(user) {
 function buatTokenReset(user) {
   return session.sign({ t: "reset", userId: user.id, f: sidikPassword(user), exp: Date.now() + RESET_TTL_MENIT * 60 * 1000 });
 }
+// Kode verifikasi daftar: nggak disimpan di database. Server cuma kasih token
+// bertanda tangan yang isinya HASH (email + kode); kodenya sendiri cuma ada di email.
+function hashKode(email, kode) {
+  return crypto.createHmac("sha256", process.env.SESSION_SECRET).update(email + ":" + kode).digest("hex");
+}
+
+async function kirimKode(req, res, b) {
+  const username = String(b.username || "").trim();
+  const email = normEmail(b.email);
+  if (!USERNAME_RE.test(username)) return res.status(400).json({ error: "Isi username dulu (3-32 karakter: huruf, angka, titik, strip, underscore)." });
+  if (!EMAIL_RE.test(email) || email.length > 100) return res.status(400).json({ error: "Format email nggak valid." });
+
+  const users = await kvStore.getUsers();
+  if (users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: "Username sudah dipakai." });
+  if (users.some((u) => normEmail(u.email) === email)) return res.status(409).json({ error: "Email sudah terdaftar di akun lain." });
+
+  if (!(await kvStore.ambilSlot("kode:" + email, 60))) return res.status(429).json({ error: "Tunggu 1 menit dulu sebelum kirim ulang kode." });
+
+  const kode = String(crypto.randomInt(100000, 1000000));
+  const token = session.sign({ t: "verif", email, h: hashKode(email, kode), exp: Date.now() + KODE_TTL_MENIT * 60 * 1000 });
+  try {
+    await kirimKodeVerifikasi({ to: email, kode, menitBerlaku: KODE_TTL_MENIT });
+  } catch (err) {
+    console.error("[kirimKode] gagal kirim email:", err.message);
+    return res.status(500).json({ error: "Email gagal dikirim. Cek alamat emailnya atau coba lagi nanti." });
+  }
+  return res.json({ ok: true, token, message: `Kode dikirim ke ${email}. Berlaku ${KODE_TTL_MENIT} menit.` });
+}
+
 function baseUrl(req) {
   if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/+$/, "");
   const proto = (req.headers["x-forwarded-proto"] || "https").split(",")[0];
@@ -51,6 +82,20 @@ async function daftar(req, res, b) {
   if (password.length < 6) return res.status(400).json({ error: "Password minimal 6 karakter." });
   if (!namaKarakter) return res.status(400).json({ error: "Nama karakter wajib diisi." });
   if (!PANGKAT_LIST.includes(pangkat)) return res.status(400).json({ error: "Pangkat nggak valid." });
+
+  // Wajib verifikasi email: kode 6 digit yang dikirim ke email itu harus benar.
+  let v = null;
+  try { v = session.verify(String(b.verifToken || "")); } catch (e) { v = null; }
+  if (!v || v.t !== "verif" || v.email !== email) {
+    return res.status(400).json({ error: "Verifikasi email dulu: klik Kirim Kode, lalu masukin kode dari email." });
+  }
+  if ((await kvStore.naik("verif:" + email + ":" + v.exp, 15 * 60)) > 5) {
+    return res.status(429).json({ error: "Terlalu banyak percobaan. Kirim kode baru ke email kamu." });
+  }
+  const cocok = hashKode(email, String(b.kodeEmail || "").trim());
+  if (cocok.length !== v.h.length || !crypto.timingSafeEqual(Buffer.from(cocok), Buffer.from(v.h))) {
+    return res.status(400).json({ error: "Kode verifikasi salah." });
+  }
 
   // Pangkat auto-HC nggak lewat approval, jadi kalau KODE_PANGKAT_TINGGI diisi di
   // Environment Variables, pendaftar wajib tahu kodenya (opsional, biar nggak sembarang orang jadi HC).
@@ -145,6 +190,7 @@ module.exports = async (req, res) => {
   const b = req.body || {};
 
   try {
+    if (b.kirimKode) return await kirimKode(req, res, b);
     if (b.daftar) return await daftar(req, res, b);
     if (b.lupa) return await lupa(req, res, b);
     if (b.reset) return await reset(req, res, b);
